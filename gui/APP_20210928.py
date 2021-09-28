@@ -14,7 +14,7 @@ from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg, FigureCanvasAgg
 import PySimpleGUI as sg
 
 from lib.DobotDLL import DobotDllType as dType
-from lib.utils.DobotFunction.Camera import WebCam_OnOff, Snapshot, scale_box, Preview, Color_cvt
+from lib.utils.DobotFunction.Camera import DeviceNameToNum, WebCam_OnOff, Snapshot, scale_box, Preview, Color_cvt
 from lib.utils.DobotFunction.Communication import (
     Connect_Disconnect,
     Operation,
@@ -38,8 +38,14 @@ from timeout_decorator import timeout, TimeoutError
 # from PIL import Image
 
 _CamList = {
-    "0", None,
-    "1", None
+    "0": {
+        "cam_num": None,
+        "cam_object": None
+    },
+    "1": {
+        "cam_num": None,
+        "cam_object": None
+    },
 }
 
 class Dobot_APP:
@@ -276,6 +282,15 @@ class Dobot_APP:
 
         WebCamConnect = [
             [
+                sg.Radio(
+                    text="0",
+                    group_id="main_cam",
+                    default=True,
+                    disabled=True,
+                    background_color="grey59",
+                    text_color="grey1",
+                    key="-main_cam_0-",
+                ),
                 # PCに接続されているカメラの選択
                 sg.InputCombo(
                     (
@@ -284,7 +299,7 @@ class Dobot_APP:
                     ),
                     default_value="TOSHIBA_Web_Camera-HD",
                     size=(15, 1),
-                    key="-WebCam_Name-",
+                    key="-WebCam_Name_0-",
                     readonly=True,
                 ),
                 # 解像度の選択
@@ -300,17 +315,26 @@ class Dobot_APP:
                     ),
                     default_value="1280x800",
                     size=(11, 1),
-                    key="-WebCam_FrameSize-",
+                    key="-WebCam_FrameSize_0-",
                     readonly=True,
                 ),
                 # Web_Cameraの接続/解放
-                sg.Button("WEB CAM 1 on/off", size=(15, 1), key="-SetWebCam-"),
+                sg.Button("WEB CAM 0 on/off", size=(15, 1), key="-SetWebCam_0-"),
                 # カメラのプレビュー
-                sg.Button("Preview Opened 1", size=(13, 1), key="-Preview-"),
+                sg.Button("Preview Opened", size=(13, 1), key="-Preview-"),
                 # 静止画撮影
-                sg.Button("Snapshot 1", size=(8, 1), key="-Snapshot-"),
+                # sg.Button("Snapshot 0", size=(8, 1), key="-Snapshot-"),
             ],
             [
+                sg.Radio(
+                    text="1",
+                    group_id="main_cam",
+                    default=False,
+                    disabled=True,
+                    background_color="grey59",
+                    text_color="grey1",
+                    key="-main_cam_1-",
+                ),
                 # PCに接続されているカメラの選択
                 sg.InputCombo(
                     (
@@ -319,7 +343,7 @@ class Dobot_APP:
                     ),
                     default_value="TOSHIBA_Web_Camera-HD",
                     size=(15, 1),
-                    key="-WebCam_Name_2-",
+                    key="-WebCam_Name_1-",
                     readonly=True,
                 ),
                 # 解像度の選択
@@ -335,15 +359,15 @@ class Dobot_APP:
                     ),
                     default_value="1280x800",
                     size=(11, 1),
-                    key="-WebCam_FrameSize_2-",
+                    key="-WebCam_FrameSize_1-",
                     readonly=True,
                 ),
                 # Web_Cameraの接続/解放
-                sg.Button("WEB CAM 2 on/off", size=(15, 1), key="-SetWebCam_2-"),
+                sg.Button("WEB CAM 1 on/off", size=(15, 1), key="-SetWebCam_1-"),
                 # カメラのプレビュー
-                sg.Button("Preview Opened 2", size=(13, 1), key="-Preview_2-"),
+                # sg.Button("Preview Opened 1", size=(13, 1), key="-Preview_1-"),
                 # 静止画撮影
-                sg.Button("Snapshot 2", size=(8, 1), key="-Snapshot_2-"),
+                sg.Button("Snapshot", size=(8, 1), key="-Snapshot-"),
             ],
             [
                 # 画像のサイズ・チャンネル数
@@ -747,49 +771,42 @@ class Dobot_APP:
         # ------------------------------------ #
         # WebCamを選択&接続するイベント #
         # ------------------------------------ #
-        elif event == "-SetWebCam-":
-            # Webカメラの番号を取得する
-            cam_num = WebCamOption(values["-WebCam_Name-"])
-            # webカメラの番号が取得できなかった場合
-            if cam_num is None:
-                sg.popup("選択したデバイスは存在しません。", title="カメラ接続エラー")
-                return
-
-            # ----------------------------#
-            # カメラを接続するイベント #
-            # --------------------------- #
-            # カメラを初めて接続する場合 -> カメラを新規接続
-            # 接続したいカメラが接続していカメラと同じ場合 -> カメラを解放
-            if (self.cam_num == None) or (self.cam_num == cam_num):
-                response, self.cam = WebCam_OnOff(cam_num, cam=self.cam)
-                sg.popup(self.WebCam_err[response], title="Camの接続")
-
-            # 接続したいカメラと接続しているカメラが違う場合 -> 接続しているカメラを解放し、新規接続
-            elif (self.cam_num != None) and (self.cam_num != cam_num):
-                # まず接続しているカメラを開放する．
-                response, self.cam = WebCam_OnOff(self.cam_num, cam=self.cam)
-                # 開放できた場合
-                if response == 1:
-                    sg.popup(self.WebCam_err[response], title="Camの接続")
-                    # 次に新しいカメラを接続する．
-                    response, self.cam = WebCam_OnOff(cam_num, cam=self.cam)
-                    sg.popup(self.WebCam_err[response], title="Camの接続")
-
-            # カメラが問題なく見つかった場合
-            if response != 2:
-                self.cam_num = cam_num
+        elif event == "-SetWebCam_0-":
+            device_name = values["-WebCam_Name_0-"]
+            res = self.WebCAMOnOffBtn(device_name, dict_num=0)
+            if res == 1:
+                self.Window["-main_cam_0-"].update(disabled=True)
             else:
-                self.cam_num = None
+                self.Window["-main_cam_0-"].update(disabled=False)
+
+        elif event == "-SetWebCam_1-":
+            device_name = values["-WebCam_Name_1-"]
+            res = self.WebCAMOnOffBtn(device_name, dict_num=1)
+            if res == 1:
+                self.Window["-main_cam_1-"].update(disabled=True)
+            else:
+                self.Window["-main_cam_1-"].update(disabled=False)
+
 
         # ---------------------------------#
         # プレビューを表示するイベント #
         # --------------------------------  #
         elif event == "-Preview-":
+            cam = None
             window_name = "frame"
 
+            if values["-main_cam_0-"]:
+                cam = _CamList["0"]["cam_object"]
+            elif values["-main_cam_1-"]:
+                cam = _CamList["1"]["cam_object"]
+
+            # どのラジオボタンもアクティブでない場合 -> カメラが1つも接続されていない場合．
+            if cam is None:
+                return
+
             while True:
-                if type(self.cam) == cv2.VideoCapture:  # カメラが接続されている場合
-                    response, img = Snapshot(self.cam)
+                if type(cam) == cv2.VideoCapture:  # カメラが接続されている場合
+                    response, img = Snapshot(cam)
                     if response:
                         # ----------------------------------------#
                         # 画像サイズなどをダイアログ上に表示 #
@@ -814,8 +831,18 @@ class Dobot_APP:
         # スナップショットを撮影するイベント #
         # --------------------------------------- #
         elif event == "-Snapshot-":
-            if type(self.cam) == cv2.VideoCapture:
-                self.IMAGE_Org, self.IMAGE_bin = self.SnapshotBtn(values)
+            cam = None
+
+            if values["-main_cam_0-"]:
+                cam = _CamList["0"]["cam_object"]
+            elif values["-main_cam_1-"]:
+                cam = _CamList["1"]["cam_object"]
+
+            # どのラジオボタンもアクティブでない場合 -> カメラが1つも接続されていない場合．
+            if cam is None:
+                return
+            elif type(cam) == cv2.VideoCapture:
+                self.IMAGE_Org, self.IMAGE_bin = self.SnapshotBtn(cam, values)
             else:
                 sg.popup(self.WebCam_err[2], title="カメラ接続エラー")
 
@@ -983,7 +1010,63 @@ class Dobot_APP:
 
         return self.CurrentPose
 
-    def SnapshotBtn(self, values: list) -> np.ndarray:
+
+    def WebCAMOnOffBtn(self, device_name: str, dict_num: int=0) -> int:
+        """カメラを接続，解除するための関数．
+
+        Args:
+            device_name (str): 接続したいカメラ名
+            dict_num (int): _CamList の key 番号．指定した番号にカメラ情報を保存する．key 番号が存在しない場合エラー．
+
+        Return:
+            response (int): Web CAM に接続できたか．
+                0: Connect
+                1: Release
+                2: Not found
+        """
+        # Webカメラの番号を取得する
+        cam_num = DeviceNameToNum(device_name=device_name)
+        # webカメラの番号が取得できなかった場合
+        if cam_num is None:
+            sg.popup("選択したデバイスは存在しません。", title="カメラ接続エラー")
+            return 2 # Not found！
+
+        # ----------------------------#
+        # カメラを接続するイベント #
+        # --------------------------- #
+        # カメラを初めて接続する場合 -> カメラを新規接続
+        # 接続したいカメラが接続していカメラと同じ場合 -> カメラを解放
+        if (_CamList[str(dict_num)]["cam_num"] is None) or (_CamList[str(dict_num)]["cam_num"] == cam_num):
+            response, cam_obj = WebCam_OnOff(cam_num, cam=_CamList[str(dict_num)]["cam_object"])
+
+        # 接続したいカメラと接続しているカメラが違う場合 -> 接続しているカメラを解放し、新規接続
+        elif (_CamList[str(dict_num)]["cam_num"] is not None):
+            # まず接続しているカメラを開放する．
+            response, cam_obj = WebCam_OnOff(
+                device_num = _CamList[str(dict_num)]["cam_num"],
+                cam=_CamList[str(dict_num)]["cam_object"]
+            )
+            # 開放できた場合
+            if response == 1:
+                sg.popup(self.WebCam_err[response], title="Camの接続")
+                # 次に新しいカメラを接続する．
+                response, cam_obj = WebCam_OnOff(cam_num, cam=cam_obj)
+
+        if response == 0: # Connect！
+            _CamList[str(dict_num)]["cam_num"] = cam_num
+            _CamList[str(dict_num)]["cam_object"] = cam_obj
+            # 1 回でもエラーが発生した場合，カメラパラメタをリセットする．
+        else: # Release or Not found
+            _CamList[str(dict_num)]["cam_num"] = None
+            _CamList[str(dict_num)]["cam_object"]  = None
+
+        # カメラの接続状況を表示
+        sg.popup(self.WebCam_err[response], title="Camの接続")
+
+        return response
+
+
+    def SnapshotBtn(self, cam: cv2.VideoCapture, values: list) -> np.ndarray:
         """スナップショットの撮影から一連の画像処理を行う関数。
 
         Args:
@@ -993,7 +1076,7 @@ class Dobot_APP:
             dst_bin (np.ndarray): 二値化処理後の画像
         """
         dst_org = dst_bin = None
-        response, img = Snapshot(self.cam)
+        response, img = Snapshot(cam)
         if response != 3:
             sg.popup(self.WebCam_err[response], title="撮影エラー")
             return

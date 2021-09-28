@@ -1,5 +1,6 @@
 import sys
-import os
+import time
+from typing import Union
 
 sys.path.append(".")
 sys.path.append("..")
@@ -11,7 +12,7 @@ import matplotlib.pyplot as plt
 from ImageProcessing.GrayScale import AutoGrayScale
 
 
-def WebCamOption(device_name: str) -> int:
+def DeviceNameToNum(device_name: str) -> int:
     """
     接続するWebCameraを選択する関数
 
@@ -36,15 +37,15 @@ def WebCamOption(device_name: str) -> int:
     return device_num
 
 
-def WebCam_OnOff(device_num: int, cam: cv2.VideoCapture = None):
+def WebCam_OnOff(device_num: int, cam: Union[cv2.VideoCapture, None] = None):
     """
     WebCameraを読み込む関数
 
     Args:
-        device_num(int): カメラデバイスを番号で指定
+        device_num (int): カメラデバイスを番号で指定
             0:PC内臓カメラ
             1:外部カメラ
-        cam(cv2.VideoCapture optional): 接続しているカメラ情報
+        cam (Union[cv2.VideoCapture, None], optional): 接続しているカメラ情報. Defaults to None.
 
     Returns:
         response(int): 動作終了を表すフラグ
@@ -56,7 +57,7 @@ def WebCam_OnOff(device_num: int, cam: cv2.VideoCapture = None):
             None: release or NotFound
     """
     if cam is None:  # カメラが接続されていないとき
-        cam = cv2.VideoCapture(device_num)
+        cam = cv2.VideoCapture(device_num, cv2.CAP_DSHOW)
         # カメラに接続できなかった場合
         if not cam.isOpened():
             return 2, None
@@ -66,6 +67,7 @@ def WebCam_OnOff(device_num: int, cam: cv2.VideoCapture = None):
 
     else:  # カメラに接続されていたとき
         cam.release()
+        cv2.destroyAllWindows()
         return 1, None
 
 
