@@ -151,8 +151,9 @@ class VisualFeedback(object):
         # メインプロセスからデータを取得
         data = data_que.get()
         api = data["api"]
+        cam = data["cam"]
         values = data["values"]
-        color = 4
+        color = 3
 
         # Dobotの姿勢情報を保存する辞書
         current_pose = {
@@ -199,55 +200,57 @@ class VisualFeedback(object):
                 Approximate = str(values["-ApproximateMode-"]),
                 drawing_figure=False
             )
-            
-            # 画像座標系の中心座標を算出
-            if len(img.shape) == 2:
-                y_r, x_r = img.shape
-            elif len(img.shape) == 3:
-                y_r, x_r, _ = img.shape
-            else:
-                ValueError("Image size is incorrect.")
-            y_r, x_r = y_r/2, x_r/2
 
-            # 目標位置との偏差
-            e_x = x_r - COG[0]
-            e_y = y_r - COG[1]
+            # 重心位置が取得できた場合
+            if COG:
+                # 画像座標系の中心座標を算出
+                if len(img.shape) == 2:
+                    y_r, x_r = img.shape
+                elif len(img.shape) == 3:
+                    y_r, x_r, _ = img.shape
+                else:
+                    ValueError("Image size is incorrect.")
+                y_r, x_r = y_r/2, x_r/2
 
-            if (-10<= e_x <= 10) or (-10 <= e_y <= 10):
-                print(current_pose)
-                ui_que.put(current_pose)
-                return
+                # 目標位置との偏差
+                e_x = x_r - COG[0]
+                e_y = y_r - COG[1]
 
-            sum_err["x"] += e_x
-            sum_err["y"] += e_y
-            # 目標座標を算出する
-            x = -K_p*e_y - K_i * sum_err["y"]
-            y = -K_p*e_x - K_i * sum_err["x"]
+                if (-10<= e_x <= 10) and (-10 <= e_y <= 10):
+                    print(current_pose)
+                    ui_que.put(current_pose)
+                    return
 
-            # 現在の Dobot の手先位置情報取得
-            pose = dType.GetPose(api)
-            for num, key in enumerate(current_pose.keys()):
-                current_pose[key] = round(pose[num], 2) # 繰り返し誤差 0.2 mm なので入力も合わせる
+                sum_err["x"] += e_x
+                sum_err["y"] += e_y
+                # 目標座標を算出する
+                x = -K_p*e_y - K_i * sum_err["y"]
+                y = -K_p*e_x - K_i * sum_err["x"]
 
-            # 現在の手先座標に画像座標系での目標位置を加える
-            current_pose["x"] += x
-            current_pose["y"] += y
+                # 現在の Dobot の手先位置情報取得
+                pose = dType.GetPose(api)
+                for num, key in enumerate(current_pose.keys()):
+                    current_pose[key] = round(pose[num], 2) # 繰り返し誤差 0.2 mm なので入力も合わせる
 
-            # Dobotの手先を目標位置まで移動させる。
-            lastIndex = dType.SetPTPCmd(
-                api,
-                ptpMoveModeDict[values["-MoveMode-"]],
-                current_pose["x"],
-                current_pose["y"],
-                current_pose["z"],
-                current_pose["r"],
-                1
-            )[0]
-            #Wait for Executing Last Command
-            while lastIndex > dType.GetQueuedCmdCurrentIndex(api)[0]:
-                pass
+                # 現在の手先座標に画像座標系での目標位置を加える
+                current_pose["x"] += x
+                current_pose["y"] += y
 
-            ui_que.put(current_pose)
+                # Dobotの手先を目標位置まで移動させる。
+                lastIndex = dType.SetPTPCmd(
+                    api,
+                    ptpMoveModeDict[values["-MoveMode-"]],
+                    current_pose["x"],
+                    current_pose["y"],
+                    current_pose["z"],
+                    current_pose["r"],
+                    1
+                )[0]
+                #Wait for Executing Last Command
+                while lastIndex > dType.GetQueuedCmdCurrentIndex(api)[0]:
+                    pass
+
+        ui_que.put(current_pose)
 
 
     def run(self):
@@ -256,6 +259,7 @@ class VisualFeedback(object):
         # thread_run = Thread(target=self.Test2, args=(self.data_que, self.ui_que), daemon=True).start()
         que = {
             "api": self.api,
+            "cam": self.cam,
             "values": self.values
         }
         self.data_que.put(que)
@@ -286,14 +290,15 @@ if __name__ == '__main__':
     if connection:
         values = {
             "-MoveMode-": 'MoveJCoordinate',
-            "-Color_Space-": 'Gray',
+            "-Color_Space-": 'RGB',
             "-Color_Density-": 'なし',
-            "-Binarization-": 'Adaptive',
+            "-Binarization-": 'Two',
             "-LowerThreshold-": '10',
             "-UpperThreshold-": '130',
             "-AdaptiveThreshold_type-": 'Mean',
             "-AdaptiveThreshold_BlockSize-": '11',
             "-AdaptiveThreshold_Constant-": '2',
+            "-CalcCOGMode-": "輪郭から重心を計算",
             "-RetrievalMode-": '2つの階層に分類する',
             "-ApproximateMode-": '中間点を保持する'
         }
