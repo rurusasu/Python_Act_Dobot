@@ -17,9 +17,22 @@ class VisualFeedback(object):
     def __init__(self, api, vf_cam: cv2.VideoCapture, values) -> None:
         super().__init__()
 
+        if values["-color_R-"]:
+            self.color = 0
+        elif values["-color_G-"]:
+            self.color = 1
+        elif values["-color_B-"]:
+            self.color = 2
+        elif values["-color_W-"]:
+            self.color = 3
+        elif values["-color_Bk-"]:
+            self.color = 4
+
         self.api = api
         self.cam = vf_cam
         self.values = values
+
+
         self.data_que = Queue() # ワーカープロセスへ送るデータ
         self.ui_que = Queue() # ワーカーから送られてくるデータ
 
@@ -123,15 +136,6 @@ class VisualFeedback(object):
         ui_que.put("動作終了")
 
 
-    def Test3(self, data_que: Queue, ui_que:Queue):
-        """オブジェクトの重心位置と，図心の偏差を計算して返す関数
-
-        Args:
-            data_que (Queue): ワーカープロセスへ送るデータ
-            ui_que (Queue): ワーカーから送られてくるデータ
-        """
-
-
     def VF_Control(self, data_que: Queue, ui_que:Queue):
         """子プロセスの処理
 
@@ -153,7 +157,7 @@ class VisualFeedback(object):
         api = data["api"]
         cam = data["cam"]
         values = data["values"]
-        color = 3
+        color = data["color"]
 
         # Dobotの姿勢情報を保存する辞書
         current_pose = {
@@ -174,93 +178,112 @@ class VisualFeedback(object):
         }
 
         # ゲイン
-        K_p = 0.25
-        K_i = 0.01
+        K_p = float(values["-Kp-"])
+        K_i = float(values["-Ki-"])
 
-        while True:
-            # スナップショット撮影
-            _, img = SnapshotCvt(
-                cam,
-                Color_Space = values["-Color_Space-"],
-                Color_Density = values["-Color_Density-"],
-                Binarization=values["-Binarization-"],
-                LowerThreshold = int(values["-LowerThreshold-"]),
-                UpperThreshold = int(values["-UpperThreshold-"]),
-                AdaptiveThreshold_type = values["-AdaptiveThreshold_type-"],
-                AdaptiveThreshold_BlockSize = int(values["-AdaptiveThreshold_BlockSize-"]),
-                AdaptiveThreshold_Constant = int(values["-AdaptiveThreshold_Constant-"]),
-                color=color
-            )
+        return_param = {
+            "pose": None,
+            "COG": []
+        }
+        try:
+            while True:
+                # スナップショット撮影
+                _, img = SnapshotCvt(
+                    cam,
+                    Color_Space = values["-Color_Space-"],
+                    Color_Density = values["-Color_Density-"],
+                    Binarization=values["-Binarization-"],
+                    LowerThreshold = int(values["-LowerThreshold-"]),
+                    UpperThreshold = int(values["-UpperThreshold-"]),
+                    AdaptiveThreshold_type = values["-AdaptiveThreshold_type-"],
+                    AdaptiveThreshold_BlockSize = int(values["-AdaptiveThreshold_BlockSize-"]),
+                    AdaptiveThreshold_Constant = int(values["-AdaptiveThreshold_Constant-"]),
+                    color=color
+                )
 
-            # 重心位置計算
-            COG, img = Contours(
-                img = img,
-                CalcCOG=str(values["-CalcCOGMode-"]),
-                Retrieval=str(values["-RetrievalMode-"]),
-                Approximate = str(values["-ApproximateMode-"]),
-                drawing_figure=False
-            )
+                # 重心位置計算
+                COG, img = Contours(
+                    img = img,
+                    CalcCOG=str(values["-CalcCOGMode-"]),
+                    Retrieval=str(values["-RetrievalMode-"]),
+                    Approximate = str(values["-ApproximateMode-"]),
+                    drawing_figure=False
+                )
 
-            # 重心位置が取得できた場合
-            if COG:
-                # 画像座標系の中心座標を算出
-                if len(img.shape) == 2:
-                    y_r, x_r = img.shape
-                elif len(img.shape) == 3:
-                    y_r, x_r, _ = img.shape
-                else:
-                    ValueError("Image size is incorrect.")
-                y_r, x_r = y_r/2, x_r/2
+                # 重心位置が取得できた場合
+                if COG:
+                    # 画像座標系の中心座標を算出
+                    if len(img.shape) == 2:
+                        y_r, x_r = img.shape
+                    elif len(img.shape) == 3:
+                        y_r, x_r, _ = img.shape
+                    else:
+                        ValueError("Image size is incorrect.")
+                    y_r, x_r = y_r/2, x_r/2
 
-                # 目標位置との偏差
-                e_x = x_r - COG[0]
-                e_y = y_r - COG[1]
+                    # 目標位置との偏差
+                    e_x = COG[0] - x_r
+                    e_y = COG[1] - y_r
 
-                if (-10<= e_x <= 10) and (-10 <= e_y <= 10):
-                    print(current_pose)
-                    ui_que.put(current_pose)
-                    return
+                    if (-10<= e_x <= 10) and (-10 <= e_y <= 10):
+                        return_param["COG"] = COG
+                        return_param["pose"] = current_pose
+                        ui_que.put(return_param)
+                        return
 
-                sum_err["x"] += e_x
-                sum_err["y"] += e_y
-                # 目標座標を算出する
-                x = -K_p*e_y - K_i * sum_err["y"]
-                y = -K_p*e_x - K_i * sum_err["x"]
+                    sum_err["x"] += e_x
+                    sum_err["y"] += e_y
+                    # 目標座標を算出する
+                    # P 制御
+                    # x = -K_p * e_y
+                    # y = -K_p * e_x
 
-                # 現在の Dobot の手先位置情報取得
-                pose = dType.GetPose(api)
-                for num, key in enumerate(current_pose.keys()):
-                    current_pose[key] = round(pose[num], 2) # 繰り返し誤差 0.2 mm なので入力も合わせる
+                    # PI 制御
+                    x = -K_p*e_y - K_i * sum_err["y"]
+                    y = -K_p*e_x - K_i * sum_err["x"]
 
-                # 現在の手先座標に画像座標系での目標位置を加える
-                current_pose["x"] += x
-                current_pose["y"] += y
+                    # 現在の Dobot の手先位置情報取得
+                    pose = dType.GetPose(api)
+                    for num, key in enumerate(current_pose.keys()):
+                        current_pose[key] = round(pose[num], 2) # 繰り返し誤差 0.2 mm なので入力も合わせる
 
-                # Dobotの手先を目標位置まで移動させる。
-                lastIndex = dType.SetPTPCmd(
-                    api,
-                    ptpMoveModeDict[values["-MoveMode-"]],
-                    current_pose["x"],
-                    current_pose["y"],
-                    current_pose["z"],
-                    current_pose["r"],
-                    1
-                )[0]
-                #Wait for Executing Last Command
-                while lastIndex > dType.GetQueuedCmdCurrentIndex(api)[0]:
-                    pass
+                    # 現在の手先座標に画像座標系での目標位置を加える
+                    current_pose["x"] += x
+                    current_pose["y"] += y
 
-        ui_que.put(current_pose)
+                    # Dobotの手先を目標位置まで移動させる。
+                    lastIndex = dType.SetPTPCmd(
+                        api,
+                        ptpMoveModeDict[values["-MoveMode-"]],
+                        current_pose["x"],
+                        current_pose["y"],
+                        current_pose["z"],
+                        current_pose["r"],
+                        1
+                    )[0]
+                    #Wait for Executing Last Command
+                    while lastIndex > dType.GetQueuedCmdCurrentIndex(api)[0]:
+                        #time.sleep(1)
+                        pass
+
+        except Exception as e:
+            print(e)
+        finally:
+            return ui_que.put(return_param)
+
+
 
 
     def run(self):
+
         thread_run = Thread(target=self.VF_Control, args=(self.data_que, self.ui_que), daemon=True).start()
         # thread_run = Thread(target=self.Test, args=(self.data_que, self.ui_que), daemon=True).start()
         # thread_run = Thread(target=self.Test2, args=(self.data_que, self.ui_que), daemon=True).start()
         que = {
             "api": self.api,
             "cam": self.cam,
-            "values": self.values
+            "values": self.values,
+            "color": self.color
         }
         self.data_que.put(que)
 
@@ -271,8 +294,9 @@ class VisualFeedback(object):
                 ui_data = None
 
             if ui_data:
-                print(ui_data)
-                break
+                #print(ui_data)
+                #break
+                return ui_data
 
 
 
@@ -293,8 +317,8 @@ if __name__ == '__main__':
             "-Color_Space-": 'RGB',
             "-Color_Density-": 'なし',
             "-Binarization-": 'Two',
-            "-LowerThreshold-": '10',
-            "-UpperThreshold-": '130',
+            "-LowerThreshold-": '103',
+            "-UpperThreshold-": '128',
             "-AdaptiveThreshold_type-": 'Mean',
             "-AdaptiveThreshold_BlockSize-": '11',
             "-AdaptiveThreshold_Constant-": '2',
@@ -304,6 +328,7 @@ if __name__ == '__main__':
         }
         device_num = 1
         cam = cv2.VideoCapture(device_num, cv2.CAP_DSHOW)
+
 
         vf = VisualFeedback(api, cam, values)
         vf.run()

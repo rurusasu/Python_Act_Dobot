@@ -14,7 +14,15 @@ from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg, FigureCanvasAgg
 import PySimpleGUI as sg
 
 from lib.DobotDLL import DobotDllType as dType
-from lib.DobotFunction.Camera import DeviceNameToNum, WebCam_OnOff, Snapshot, scale_box, Preview, Color_cvt, SnapshotCvt, Contours
+from lib.DobotFunction.Camera import (
+    DeviceNameToNum,
+    WebCam_OnOff,
+    Snapshot,
+    scale_box,
+    Preview,
+    SnapshotCvt,
+    Contours
+)
 from lib.DobotFunction.Communication import (
     Connect_Disconnect,
     Operation,
@@ -121,6 +129,7 @@ class Dobot_APP:
                     readonly=True,
                 ),
             ],
+            []
         ]
 
         EndEffector = [
@@ -131,15 +140,34 @@ class Dobot_APP:
         # タスク1
         Task = [
             [
-                sg.Button("タスク実行", size=(9, 1), key="-Task-"),
+                sg.Button("タスク実行", size=(9, 1), disabled=True, key="-Task-"),
                 sg.InputCombo(
                     ("Task_1", "Task_2"),
                     default_value="Task_1",
                     size=(9, 1),
+                    disabled=True,
                     key="-TaskNum-",
                     readonly=True
                 ),
             ],
+            [
+                sg.Text("Kp", size=(2, 1)),
+                sg.InputText(
+                    default_text="0.05",
+                    size=(5, 1),
+                    disabled=False,
+                    key="-Kp-",
+                    readonly=False,
+                ),
+                sg.Text("Ki", size=(2, 1)),
+                sg.InputText(
+                    default_text="0.01",
+                    size=(5, 1),
+                    disabled=False,
+                    key="-Ki-",
+                    readonly=False,
+                ),
+            ]
         ]
 
         GetPose = [
@@ -731,8 +759,15 @@ class Dobot_APP:
             )
 
             if self.connection:
+                # Task 実行ボタンを起動
+                self.Window["-Task-"].update(disabled=False)
+                self.Window["-TaskNum-"].update(disabled=False)
                 # Dobotの現在の姿勢を画面上に表示
                 self.current_pose = self.GetPose_UpdateWindow()
+            else:
+                # Task 実行ボタンを無効化
+                self.Window["-Task-"].update(disabled=True)
+                self.Window["-TaskNum-"].update(disabled=True)
 
         # ----------------------- #
         # グリッパを動作させる #
@@ -960,18 +995,15 @@ class Dobot_APP:
                 # どのラジオボタンもアクティブでない場合 -> カメラが1つも接続されていない場合．
                 if cam is None: return
 
-                VisualFeedback(self.api, cam, values)
+                vf = VisualFeedback(self.api, cam, values)
+                data = vf.run()
 
-                # 画像を撮影 & 重心位置を計算
-                # COG, _ = self.ContoursBtn(values)
-                # 現在のDobotの姿勢を取得
-                # pose = self.GetPose_UpdateWindow()  # pose -> self.CurrentPose
+                if data["pose"] is not None:
+                    self.current_pose = data["pose"]
 
-
-
-
-
-
+                if data["COG"]:
+                    self.Window["-CenterOfGravity_x-"].update(str(data["COG"]))
+                    self.Window["-CenterOfGravity_y-"].update(str(data["COG"]))
 
 
     def main(self):
