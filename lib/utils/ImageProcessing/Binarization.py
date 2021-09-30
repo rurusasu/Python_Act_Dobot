@@ -1,4 +1,6 @@
-import sys, os
+import os
+import sys
+from typing import Literal
 
 sys.path.append(".")
 sys.path.append("..")
@@ -7,13 +9,13 @@ sys.path.append("../../")
 import cv2
 import numpy as np
 
-from ImageProcessing.GrayScale import AutoGrayScale
+from lib.utils.ImageProcessing.GrayScale import AutoGrayScale
 
 
 def GlobalThreshold(
     img: np.ndarray,
     threshold: int = 127,
-    Type: str = "cv2",
+    Type: Literal["cv2", "Otsu"] = "cv2",
 ) -> np.ndarray:
     """
     画素値が閾値より大きければある値(白色'255')を割り当て，そうでなければ別の値(黒色)を割り当てる。
@@ -25,7 +27,7 @@ def GlobalThreshold(
         threshold (int optional):
             2値化するときの閾値(0 <= th <= 255)
             default: 127
-        Type (str optional):
+        Type (Literal["cv2", "Otsu"] optional):
             閾値の処理方法
             * "cv2": OpenCVの関数を用いて二値化を行う: default
             * "Otsu: 大津の二値化処理
@@ -229,7 +231,7 @@ def TwoThreshold(
     LowerThreshold: int=0,
     UpperThreshold: int=128,
     PickupColor: int=4,
-    Type=cv2.THRESH_BINARY):
+    Type: Literal["cv2", "Otsu"] = "cv2"):
     """
     上側と下側の2つの閾値で2値化を行う。
     二値化には大局的閾値処理を用いる。
@@ -245,13 +247,10 @@ def TwoThreshold(
             抽出したい色を指定する。
             * 0: 赤, 1: 緑, 2: 青, 3: 白, 4: 黒色
             default: 4
-        Type (optional):
+        Type (Literal["cv2", "Otsu"] optional):
             閾値の処理方法
-            ・cv2.THRESH_BINARY
-            ・cv2.THRESH_BINARY_INV
-            ・cv2.THRESH_TRUNC
-            ・cv2.THRESH_TOZERO
-            ・cv2.THRESH_TOZERO_INV
+            * "cv2": OpenCVの関数を用いて二値化を行う: default
+            * "Otsu: 大津の二値化処理
 
     Return:
         IMAGE_bw (np.ndarray):
@@ -274,7 +273,7 @@ def TwoThreshold(
     IMAGE_G__ = GlobalThreshold(g, LowerThreshold, Type)
     IMAGE_G__ = cv2.bitwise_not(IMAGE_G__)
     # for Blue
-    MAGE_B_bw = GlobalThreshold(b, UpperThreshold, Type)
+    IMAGE_B_bw = GlobalThreshold(b, UpperThreshold, Type)
     IMAGE_B__ = GlobalThreshold(b, LowerThreshold, Type)
     IMAGE_B__ = cv2.bitwise_not(IMAGE_B__)
 

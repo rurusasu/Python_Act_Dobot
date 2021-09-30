@@ -1,6 +1,6 @@
 import sys
 import time
-from typing import Union
+from typing import Union, Literal
 
 sys.path.append(".")
 sys.path.append("..")
@@ -9,7 +9,14 @@ import cv2
 import numpy as np
 import matplotlib.pyplot as plt
 
-from ImageProcessing.GrayScale import AutoGrayScale
+from lib.utils.ImageProcessing.Binarization import (
+    GlobalThreshold,
+    AdaptiveThreshold,
+    TwoThreshold,
+)
+from lib.utils.ImageProcessing.Contrast import Contrast_cvt
+from lib.utils.ImageProcessing.CenterOfGravity import CenterOfGravity
+from lib.utils.ImageProcessing.GrayScale import AutoGrayScale
 
 
 def DeviceNameToNum(device_name: str) -> int:
@@ -88,9 +95,9 @@ def Snapshot(cam: cv2.VideoCapture) -> np.ndarray:
     ret, img = cam.read()  # 静止画像をGET
     # 静止画が撮影できた場合
     if ret:
-        # dst = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)  # BGR -> RGB
+        dst = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)  # BGR -> RGB
         # dst = np.array(dst)
-        dst = img
+        # dst = img
         return 3, dst
     # 撮影できなかった場合
     else:
@@ -190,6 +197,116 @@ def Color_cvt(src: np.ndarray, color_type: str):
         print(e)
     else:
         return dst
+
+
+def SnapshotCvt(
+    cam: cv2.VideoCapture,
+    Color_Space: Literal["RGB", "Gray"]="RGB",
+    Color_Density: Literal["なし", "線形濃度変換", "ヒストグラム平坦化"]="なし",
+    Binarization: Literal["なし", "Global", "Otsu", "Adaptive", "Two"]="なし",
+    LowerThreshold: int = 10,
+    UpperThreshold: int = 150,
+    AdaptiveThreshold_type: Literal["Mean", "Gaussian", "Wellner"]="Mean",
+    AdaptiveThreshold_BlockSize: int=11,
+    AdaptiveThreshold_Constant: int=2,
+    color: int=4):
+    dst_org = dst_bin = None
+    response, img = Snapshot(cam)
+    if response != 3:
+        return 4 # WebCam_NotGetImage
+
+    dst_org = img.copy()
+
+    # ---------------------------
+    # 撮影した画像を変換する。
+    # ---------------------------
+    # 色空間変換
+    if Color_Space != "RGB":
+        img = Color_cvt(img, Color_Space)
+    # 濃度変換
+    if Color_Density != "なし":
+        img = Contrast_cvt(img, Color_Density)
+    # 二値化処理
+    if Binarization != "なし":  # 二値化処理
+        if Binarization == "Global":  # 大域的二値化処理
+            img = GlobalThreshold(img, threshold=LowerThreshold)
+        elif Binarization == "Otsu":  # 大津の二値化処理
+            img = GlobalThreshold(img, Type="Otsu")
+        elif Binarization == "Adaptive":
+            img = AdaptiveThreshold(
+                img=img,
+                method=str(AdaptiveThreshold_type),
+                block_size=AdaptiveThreshold_BlockSize,
+                C=AdaptiveThreshold_Constant,
+            )
+        elif Binarization == "Two":  # 2つの閾値を用いた二値化処理
+            # ピックアップする色を番号に変換
+
+            img = TwoThreshold(
+                img=img,
+                LowerThreshold=LowerThreshold,
+                UpperThreshold=UpperThreshold,
+                PickupColor=color,
+            )
+
+    return dst_org, img
+
+
+def Contours(
+    img: np.ndarray,
+    CalcCOG: Literal["画像から重心を計算", "輪郭から重心を計算"],
+    Retrieval: Literal["親子関係を無視する", "最外の輪郭を検出する", "2つの階層に分類する", "全階層情報を保持する"],
+    Approximate: Literal["中間点を保持する", "中間点を保持しない"],
+    drawing_figure: bool = True
+    ):
+        """スナップショットの撮影からオブジェクトの重心位置計算までの一連の画像処理を行う関数。
+
+        Args:
+            img(np.ndarray): 接続しているカメラ情報
+            CalcCOG(Literal["画像から重心を計算", "輪郭から重心を計算"]): 重心位置の計算対象を指定．
+            Retrieval(Literal["親子関係を無視する", "最外の輪郭を検出する", "2つの階層に分類する", "全階層情報を保持する"]): 2値画像の画素値が 255 の部分と 0 の部分を分離した際に，その親子関係を保持するか指定．
+            Approximate(Literal["中間点を保持する", "中間点を保持しない"]): 輪郭の中間点を保持するか指定．
+            drawing_figure(bool): 図を描画する．Default to True.
+        Returns:
+            COG(list): COG=[x, y], オブジェクトの重心位置
+        """
+        COG = []
+        CalcCOGMode = {
+            "画像から重心を計算": 0,
+            "輪郭から重心を計算": 1,
+        }
+        # 輪郭情報
+        RetrievalMode = {
+            "親子関係を無視する": cv2.RETR_LIST,
+            "最外の輪郭を検出する": cv2.RETR_EXTERNAL,
+            "2つの階層に分類する": cv2.RETR_CCOMP,
+            "全階層情報を保持する": cv2.RETR_TREE,
+        }
+        # 輪郭の中間点情報
+        ApproximateMode = {
+            "中間点を保持する": cv2.CHAIN_APPROX_NONE,
+            "中間点を保持しない": cv2.CHAIN_APPROX_SIMPLE,
+        }
+
+
+        if type(img) != np.ndarray:
+            raise TypeError("入力はnumpy配列を使用してください．")
+        elif img.max == 0:
+            raise ValueError("画像にオブジェクトが映っていません．")
+        try:
+            COG, img = CenterOfGravity(
+                bin_img=img,
+                RetrievalMode=RetrievalMode[Retrieval],
+                ApproximateMode=ApproximateMode[Approximate],
+                min_area=100,
+                cal_Method=CalcCOGMode[CalcCOG],
+                drawing_figure=drawing_figure
+            )
+        except Exception as e:
+            print("Gravity center position calculation error")
+        finally:
+            return COG, img
+
 
 
 if __name__ == "__main__":

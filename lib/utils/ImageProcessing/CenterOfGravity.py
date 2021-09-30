@@ -37,6 +37,7 @@ def CenterOfGravity(
         drawing_figure (bool optional): 輪郭線と重心位置が示された図を描画する。default to True
     Return:
         G(list): G=[x, y], オブジェクトの重心座標
+        dst (np.ndarray): 重心位置が描画された二値画像
     """
 
     # 入力が2値画像以外の場合
@@ -76,11 +77,18 @@ def CenterOfGravity(
     except ZeroDivisionError:
         return None
 
-    if drawing_figure:
-        cv2.circle(dst, (cx, cy), 4, 100, 2, 4)  # 重心位置を円で表示
-        cv2.imshow('Convert', dst)  # 画像として出力
+    # 重心位置を円で表示
+    # 変数: img, 中心座標, 半径, 色
+    cv2.circle(dst,
+                   center=(cx, cy),
+                   radius=10,
+                   color=100,
+                   thickness=2)
 
-    return [cx, cy]
+    if drawing_figure:
+        cv2.imshow('Convert', dst)  # 画像を出力
+
+    return [cx, cy], dst
 
 
 def _ExtractContours(

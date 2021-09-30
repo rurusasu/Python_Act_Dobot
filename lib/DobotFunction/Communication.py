@@ -1,6 +1,9 @@
 # cording: ustf-8
 import sys, os
 
+from matplotlib.pyplot import pink
+from numpy import dtype
+
 sys.path.append(".")
 sys.path.append("..")
 sys.path.append("../../")
@@ -18,6 +21,13 @@ CON_STR = {
             dType.DobotConnect.DobotConnect_NotFound: "DobotConnect_NotFound",
             dType.DobotConnect.DobotConnect_Occupied: "DobotConnect_Occupied",
         }
+
+HomePoint = {
+    "x": 200,
+    "y": 0,
+    "z": 0,
+    "r": 0
+}
 
 # 関節座標系における各モータの速度および加速度の初期値
 ptpJointParams = {
@@ -117,10 +127,16 @@ def initDobot(api):
 
     # Home Params の設定
     dType.SetHOMEParams(
-        api, 150, -200, 100, 0, isQueued=1
+        api,
+        HomePoint["x"],
+        HomePoint["y"],
+        HomePoint["z"],
+        HomePoint["r"],
+        isQueued=1
     )  # Async Motion Params Setting
     dType.SetHOMECmd(api, temp=0, isQueued=1)  # Async Home
-    time.sleep(20) # 初期位置への移動待ち
+
+    #time.sleep(20) # 初期位置への移動待ち
     # JOGパラメータの設定
     dType.SetJOGJointParams(
         api, 200, 200, 200, 200, 200, 200, 200, 200, isQueued=1
@@ -193,7 +209,13 @@ def initDobot(api):
                          params[3]))
 
     # PTP動作の速度、加速度の比率を設定
-    dType.SetPTPCommonParams(api, 100, 100, isQueued=1)
+    lastIndex = dType.SetPTPCommonParams(api, 100, 100, isQueued=1)[0]
+
+    #Wait for Executing Last Command
+    while lastIndex > dType.GetQueuedCmdCurrentIndex(api)[0]:
+        pass
+    return None
+
 
 
 # -----------------------------------
