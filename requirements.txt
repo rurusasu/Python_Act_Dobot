@@ -1,0 +1,10 @@
+easydict
+matplotlib
+numpy
+opencv-python
+Pillow
+PySimpleGUI
+scikit-image
+scipy
+timeout
+timeout-decorator
