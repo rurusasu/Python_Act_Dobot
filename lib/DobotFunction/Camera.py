@@ -1,6 +1,6 @@
 import sys
 import time
-from typing import Union, Literal
+from typing import Tuple, Union, Literal
 
 sys.path.append(".")
 sys.path.append("..")
@@ -198,6 +198,54 @@ def Color_cvt(src: np.ndarray, color_type: str):
     else:
         return dst
 
+def ImageCvt(
+    img: np.ndarray,
+    Color_Space: Literal["RGB", "Gray"]="RGB",
+    Color_Density: Literal["なし", "線形濃度変換", "ヒストグラム平坦化"]="なし",
+    Binarization: Literal["なし", "Global", "Otsu", "Adaptive", "Two"]="なし",
+    LowerThreshold: int = 10,
+    UpperThreshold: int = 150,
+    AdaptiveThreshold_type: Literal["Mean", "Gaussian", "Wellner"]="Mean",
+    AdaptiveThreshold_BlockSize: int=11,
+    AdaptiveThreshold_Constant: int=2,
+    color: int=4
+) -> Tuple[int, np.ndarray]:
+    dst = img.copy()
+
+    # ---------------------------
+    # 撮影した画像を変換する。
+    # ---------------------------
+    # 色空間変換
+    if Color_Space != "RGB":
+        dst = Color_cvt(dst, Color_Space)
+    # 濃度変換
+    if Color_Density != "なし":
+        dst = Contrast_cvt(dst, Color_Density)
+    # 二値化処理
+    if Binarization != "なし":  # 二値化処理
+        if Binarization == "Global":  # 大域的二値化処理
+            dst = GlobalThreshold(dst, threshold=LowerThreshold)
+        elif Binarization == "Otsu":  # 大津の二値化処理
+            dst = GlobalThreshold(dst, Type="Otsu")
+        elif Binarization == "Adaptive":
+            dst= AdaptiveThreshold(
+                img=dst,
+                method=str(AdaptiveThreshold_type),
+                block_size=AdaptiveThreshold_BlockSize,
+                C=AdaptiveThreshold_Constant,
+            )
+        elif Binarization == "Two":  # 2つの閾値を用いた二値化処理
+            # ピックアップする色を番号に変換
+
+            dst = TwoThreshold(
+                img=dst,
+                LowerThreshold=LowerThreshold,
+                UpperThreshold=UpperThreshold,
+                PickupColor=color,
+            )
+
+    return 5, img, dst
+
 
 def SnapshotCvt(
     cam: cv2.VideoCapture,
@@ -209,48 +257,27 @@ def SnapshotCvt(
     AdaptiveThreshold_type: Literal["Mean", "Gaussian", "Wellner"]="Mean",
     AdaptiveThreshold_BlockSize: int=11,
     AdaptiveThreshold_Constant: int=2,
-    color: int=4):
+    color: int=4) -> Tuple[int, np.ndarray, np.ndarray]:
     dst_org = dst_bin = None
-    response, img = Snapshot(cam)
+    response, dst_org = Snapshot(cam)
+
     if response != 3:
-        return 4 # WebCam_NotGetImage
+        return 4, [] # WebCam_NotGetImage
 
-    dst_org = img.copy()
+    err, _, dst_bin = ImageCvt(
+        dst_org,
+        Color_Space=Color_Space,
+        Color_Density=Color_Density,
+        Binarization=Binarization,
+        LowerThreshold=LowerThreshold,
+        UpperThreshold=UpperThreshold,
+        AdaptiveThreshold_type=AdaptiveThreshold_type,
+        AdaptiveThreshold_BlockSize=AdaptiveThreshold_BlockSize,
+        AdaptiveThreshold_Constant=AdaptiveThreshold_Constant,
+        color=color
+    )
 
-    # ---------------------------
-    # 撮影した画像を変換する。
-    # ---------------------------
-    # 色空間変換
-    if Color_Space != "RGB":
-        img = Color_cvt(img, Color_Space)
-    # 濃度変換
-    if Color_Density != "なし":
-        img = Contrast_cvt(img, Color_Density)
-    # 二値化処理
-    if Binarization != "なし":  # 二値化処理
-        if Binarization == "Global":  # 大域的二値化処理
-            img = GlobalThreshold(img, threshold=LowerThreshold)
-        elif Binarization == "Otsu":  # 大津の二値化処理
-            img = GlobalThreshold(img, Type="Otsu")
-        elif Binarization == "Adaptive":
-            img = AdaptiveThreshold(
-                img=img,
-                method=str(AdaptiveThreshold_type),
-                block_size=AdaptiveThreshold_BlockSize,
-                C=AdaptiveThreshold_Constant,
-            )
-        elif Binarization == "Two":  # 2つの閾値を用いた二値化処理
-            # ピックアップする色を番号に変換
-
-            img = TwoThreshold(
-                img=img,
-                LowerThreshold=LowerThreshold,
-                UpperThreshold=UpperThreshold,
-                PickupColor=color,
-            )
-
-    return dst_org, img
-
+    return err, dst_org, dst_bin
 
 def Contours(
     img: np.ndarray,
@@ -262,7 +289,7 @@ def Contours(
         """スナップショットの撮影からオブジェクトの重心位置計算までの一連の画像処理を行う関数。
 
         Args:
-            img(np.ndarray): 接続しているカメラ情報
+            img(np.ndarray): 重心計算対象の二値画像．
             CalcCOG(Literal["画像から重心を計算", "輪郭から重心を計算"]): 重心位置の計算対象を指定．
             Retrieval(Literal["親子関係を無視する", "最外の輪郭を検出する", "2つの階層に分類する", "全階層情報を保持する"]): 2値画像の画素値が 255 の部分と 0 の部分を分離した際に，その親子関係を保持するか指定．
             Approximate(Literal["中間点を保持する", "中間点を保持しない"]): 輪郭の中間点を保持するか指定．

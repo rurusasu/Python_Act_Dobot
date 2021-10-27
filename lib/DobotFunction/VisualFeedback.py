@@ -1,6 +1,7 @@
 import time
 import sys
 from queue import Queue
+from typing import Literal
 from threading import Thread
 
 sys.path.append("../../")
@@ -144,7 +145,6 @@ class VisualFeedback(object):
             ui_que (Queue): ワーカーから送られてくるデータ
         """
         from lib.DobotDLL import DobotDllType as dType
-        #from lib.DobotFunction.Communication import SetPoseAct
 
         ptpMoveModeDict = {
             "JumpCoordinate": dType.PTPMode.PTPJUMPXYZMode,
@@ -188,7 +188,7 @@ class VisualFeedback(object):
         try:
             while True:
                 # スナップショット撮影
-                _, img = SnapshotCvt(
+                _, _, img = SnapshotCvt(
                     cam,
                     Color_Space = values["-Color_Space-"],
                     Color_Density = values["-Color_Density-"],
@@ -266,17 +266,19 @@ class VisualFeedback(object):
                         #time.sleep(1)
                         pass
 
+
         except Exception as e:
-            print(e)
+            print(f"Visual Feedback Error: {e}")
         finally:
             return ui_que.put(return_param)
 
-
-
-
-    def run(self):
-
-        thread_run = Thread(target=self.VF_Control, args=(self.data_que, self.ui_que), daemon=True).start()
+    def run(self, target: Literal["test", "test2", "vf"]):
+        if target == "test":
+            thread_run = Thread(target=self.Test, args=(self.data_que, self.ui_que), daemon=True).start()
+        elif target == "test2":
+            thread_run = Thread(target=self.Test2, args=(self.data_que, self.ui_que), daemon=True).start()
+        elif target == "vf":
+            thread_run = Thread(target=self.VF_Control, args=(self.data_que, self.ui_que), daemon=True).start()
         # thread_run = Thread(target=self.Test, args=(self.data_que, self.ui_que), daemon=True).start()
         # thread_run = Thread(target=self.Test2, args=(self.data_que, self.ui_que), daemon=True).start()
         que = {
@@ -324,11 +326,18 @@ if __name__ == '__main__':
             "-AdaptiveThreshold_Constant-": '2',
             "-CalcCOGMode-": "輪郭から重心を計算",
             "-RetrievalMode-": '2つの階層に分類する',
-            "-ApproximateMode-": '中間点を保持する'
+            "-ApproximateMode-": '中間点を保持する',
+            "-color_R-": False,
+            "-color_G-": False,
+            "-color_B-": True,
+            "-color_W-": False,
+            "-color_Bk-": False,
+            "-Kp-": 0.05,
+            "-Ki-": 0.01,
         }
         device_num = 1
         cam = cv2.VideoCapture(device_num, cv2.CAP_DSHOW)
 
 
         vf = VisualFeedback(api, cam, values)
-        vf.run()
+        vf.run(target="vf")
