@@ -1,5 +1,6 @@
 import sys
 import os
+from typing import List, Tuple, Union
 
 sys.path.append(".")
 sys.path.append("../")
@@ -10,18 +11,21 @@ import numpy as np
 
 
 def CenterOfGravity(
+    rgb_img: np.ndarray,
     bin_img: np.ndarray,
     RetrievalMode=cv2.RETR_EXTERNAL,
     ApproximateMode=cv2.CHAIN_APPROX_NONE,
     min_area=100,
-    cal_Method: int=0,
-    drawing_figure: bool=True
-) -> list:
+    cal_Method: int = 0,
+    orientation: bool = False,
+    drawing_figure: bool = True,
+) -> Tuple[Union[List[float], None], np.ndarray]:
     """
     オブジェクトの図心を計算する関数
 
     Args:
-        bin_img (np.ndarray): 二値画像
+        rgb_img (np.ndarray): 計算された重心位置を重ねて表示するRGB画像
+        bin_img (np.ndarray): 重心計算対象の二値画像．
         RetrievalMode (optional): 輪郭の階層情報
             * cv2.RETR_LIST: 輪郭の親子関係を無視する(親子関係が同等に扱われるので、単なる輪郭として解釈される)。
             * cv2.RETR_EXTERNAL: 最も外側の輪郭だけを検出するモード
@@ -34,34 +38,35 @@ def CenterOfGravity(
         cal_Method (int optional): 重心計算を行う方法を選択する
             * 0: 画像から重心を計算
             * 1: オブジェクトの輪郭から重心を計算
+        orientation (bool, optional): オブジェクトの輪郭情報に基づいて姿勢を推定する関数．`cal_Method = 1` の場合のみ適用可能．Default to False.
         drawing_figure (bool optional): 輪郭線と重心位置が示された図を描画する。default to True
     Return:
-        G(list): G=[x, y], オブジェクトの重心座標
+        G (Union[List[float], None]): G=[x, y, angle], オブジェクトの重心座標と，そのオブジェクトの2D平面での回転角度．
         dst (np.ndarray): 重心位置が描画された二値画像
     """
-
+    angle = None
     # 入力が2値画像以外の場合
     if (type(bin_img) is not np.ndarray) or (len(bin_img.shape) != 2):
-        raise ValueError('入力画像が不正です！')
+        raise ValueError("入力画像が不正です！")
 
-    dst = bin_img.copy()
+    dst_rgb = rgb_img.copy()
+    dst_bin = bin_img.copy()
     # 画像をもとに重心を求める場合
     if cal_Method == 0:
-        M = cv2.moments(dst, False)
+        M = cv2.moments(dst_bin, False)
 
     # 輪郭から重心を求める場合
     else:
         contours = _ExtractContours(
-            bin_img=dst,
+            bin_img=dst_bin,
             RetrievalMode=RetrievalMode,
             ApproximateMode=ApproximateMode,
-            min_area=min_area
-            )
-
+            min_area=min_area,
+        )
 
         # 等高線の描画（Contour line drawing）
         if drawing_figure:
-            dst = __drawing_edge(dst, contours)
+            dst_bin = __drawing_edge(dst_bin, contours)
 
         maxCont = contours[0]
         for c in contours:
@@ -69,26 +74,45 @@ def CenterOfGravity(
                 maxCont = c
 
         M = cv2.moments(maxCont)
+
+        if orientation:
+            # オブジェクトの輪郭情報から回転角度を計算する．
+            # REF: https://seinzumtode.hatenadiary.jp/entry/20171121/1511241157
+            # OpenCV-Doc: http://labs.eecs.tottori-u.ac.jp/sd/Member/oyamada/OpenCV/html/py_tutorials/py_imgproc/py_contours/py_contour_features/py_contour_features.html
+            for i, cnt in enumerate(contours):
+                # ellipse = cv2.fitEllipse(cnt)
+                # dst_bin = cv2.ellipse(dst_bin, ellipse, (255, 0, 0), 2)
+                rect = cv2.minAreaRect(cnt)
+                # 角度計算の補正
+                # REF: https://stackoverflow.com/questions/15956124/minarearect-angles-unsure-about-the-angle-returned
+                _, (w, h), angle = rect
+                if w > h:
+                    angle += 90
+
+                # 外接矩形4点を求める
+                # box = cv2.boxPoints(ellipse)
+                box = cv2.boxPoints(rect)
+
+                box = np.int0(box)
+                dst_rgb = cv2.drawContours(dst_rgb, [box], 0, (0, 0, 255), 2)
+                # 小数点以下2桁に丸め
+                angle = round(angle, 2)
     if int(M["m00"]) == 0:
-        return None
+        return None, dst_rgb
 
     try:
         cx, cy = int(M["m10"] / M["m00"]), int(M["m01"] / M["m00"])
     except ZeroDivisionError:
-        return None
+        return None, dst_rgb
 
     # 重心位置を円で表示
     # 変数: img, 中心座標, 半径, 色
-    cv2.circle(dst,
-                   center=(cx, cy),
-                   radius=10,
-                   color=100,
-                   thickness=2)
+    cv2.circle(dst_rgb, center=(cx, cy), radius=10, color=100, thickness=2)
 
     if drawing_figure:
-        cv2.imshow('Convert', dst)  # 画像を出力
+        cv2.imshow("Convert", dst_rgb)  # 画像を出力
 
-    return [cx, cy], dst
+    return [cx, cy, angle], dst_rgb
 
 
 def _ExtractContours(
@@ -98,7 +122,7 @@ def _ExtractContours(
     min_area=100,
 ) -> np.ndarray:
     """
-    画像に含まれるオブジェクトの輪郭を抽出する関数。
+    画像に含まれるオブジェクトの輪郭(contours)を抽出する関数。
     黒い背景（暗い色）から白い物体（明るい色）の輪郭を検出すると仮定。
 
     Args:
@@ -117,9 +141,10 @@ def _ExtractContours(
         approx (list[int]): 近似した輪郭情報
     """
     # 輪郭検出（Detection contours）
+    # contours: 輪郭線の画素位置の numpy 配列
     contours, hierarchy = cv2.findContours(bin_img, RetrievalMode, ApproximateMode)
     # 小さい輪郭は誤検出として削除する
-    contrours = list(filter(lambda x: cv2.contourArea(x) > 100, contours))
+    contours = list(filter(lambda x: cv2.contourArea(x) > min_area, contours))
     # 輪郭近似（Contour approximation）
     approx = __approx_contour(contours)
 
@@ -138,15 +163,12 @@ def __approx_contour(contours: list):
     approx = []
     for i in range(len(contours)):
         cnt = contours[i]
-        epsilon = 0.001 * cv2.arcLength(cnt, True) # 実際の輪郭と近似輪郭の最大距離を表し、近似の精度を表すパラメータ
+        epsilon = 0.001 * cv2.arcLength(cnt, True)  # 実際の輪郭と近似輪郭の最大距離を表し、近似の精度を表すパラメータ
         approx.append(cv2.approxPolyDP(cnt, epsilon, True))
     return approx
 
 
-def __drawing_edge(
-    src: np.ndarray,
-    contours: list
-    ) -> np.ndarray:
+def __drawing_edge(src: np.ndarray, contours: list) -> np.ndarray:
     """
     入力されたimgに抽出した輪郭線を描く関数
 
@@ -169,9 +191,9 @@ if __name__ == "__main__":
     from ImageProcessing.Binarization import GlobalThreshold
 
     img_path = cfg.TEST_IMG_ORG_DIR + os.sep + "lena.png"
-    img = np.array(Image.open(img_path)) # ロード
-    img = AutoGrayScale(img, clearly=True) # RGB -> Gray
-    img = GlobalThreshold(img) # Gray -> Binary
+    img = np.array(Image.open(img_path))  # ロード
+    img = AutoGrayScale(img, clearly=True)  # RGB -> Gray
+    img = GlobalThreshold(img)  # Gray -> Binary
     # ----- #
     # テスト #
     # ----  #

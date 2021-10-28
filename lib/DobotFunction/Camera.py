@@ -1,6 +1,5 @@
 import sys
-import time
-from typing import Tuple, Union, Literal
+from typing import Tuple, Union, List, Literal
 
 sys.path.append(".")
 sys.path.append("..")
@@ -171,25 +170,26 @@ def Preview(img: np.ndarray = None, window_name: str = "frame", preview: str = "
     else:
         return -1
 
+
 def Color_cvt(src: np.ndarray, color_type: str):
     """画像の色空間を変換する関数
-        変換には OpenCV の関数を使用する。
+    変換には OpenCV の関数を使用する。
 
-        Args:
-            src (np.ndarray): 変換前の画像
-            color_type (str): 変更後の色空間
-            * Gray: グレースケール
-            * HSV: HDV空間
+    Args:
+        src (np.ndarray): 変換前の画像
+        color_type (str): 変更後の色空間
+        * Gray: グレースケール
+        * HSV: HDV空間
 
-        Return:
-            det (np.ndarray): 変換後の画像
+    Return:
+        det (np.ndarray): 変換後の画像
     """
     dst = src.copy()
     try:
-        if color_type == 'Gray':
-            #dst = cv2.cvtColor(dst, cv2.COLOR_RGB2GRAY)
+        if color_type == "Gray":
+            # dst = cv2.cvtColor(dst, cv2.COLOR_RGB2GRAY)
             dst = AutoGrayScale(dst, clearly=True)
-        elif color_type == 'HSV':
+        elif color_type == "HSV":
             dst = cv2.cvtColor(dst, cv2.COLOR_RGB2HSV)
         else:
             raise ValueError("選択された変換は存在しません。")
@@ -198,17 +198,18 @@ def Color_cvt(src: np.ndarray, color_type: str):
     else:
         return dst
 
+
 def ImageCvt(
     img: np.ndarray,
-    Color_Space: Literal["RGB", "Gray"]="RGB",
-    Color_Density: Literal["なし", "線形濃度変換", "ヒストグラム平坦化"]="なし",
-    Binarization: Literal["なし", "Global", "Otsu", "Adaptive", "Two"]="なし",
+    Color_Space: Literal["RGB", "Gray"] = "RGB",
+    Color_Density: Literal["なし", "線形濃度変換", "ヒストグラム平坦化"] = "なし",
+    Binarization: Literal["なし", "Global", "Otsu", "Adaptive", "Two"] = "なし",
     LowerThreshold: int = 10,
     UpperThreshold: int = 150,
-    AdaptiveThreshold_type: Literal["Mean", "Gaussian", "Wellner"]="Mean",
-    AdaptiveThreshold_BlockSize: int=11,
-    AdaptiveThreshold_Constant: int=2,
-    color: int=4
+    AdaptiveThreshold_type: Literal["Mean", "Gaussian", "Wellner"] = "Mean",
+    AdaptiveThreshold_BlockSize: int = 11,
+    AdaptiveThreshold_Constant: int = 2,
+    color: int = 4,
 ) -> Tuple[int, np.ndarray]:
     dst = img.copy()
 
@@ -228,7 +229,7 @@ def ImageCvt(
         elif Binarization == "Otsu":  # 大津の二値化処理
             dst = GlobalThreshold(dst, Type="Otsu")
         elif Binarization == "Adaptive":
-            dst= AdaptiveThreshold(
+            dst = AdaptiveThreshold(
                 img=dst,
                 method=str(AdaptiveThreshold_type),
                 block_size=AdaptiveThreshold_BlockSize,
@@ -249,20 +250,21 @@ def ImageCvt(
 
 def SnapshotCvt(
     cam: cv2.VideoCapture,
-    Color_Space: Literal["RGB", "Gray"]="RGB",
-    Color_Density: Literal["なし", "線形濃度変換", "ヒストグラム平坦化"]="なし",
-    Binarization: Literal["なし", "Global", "Otsu", "Adaptive", "Two"]="なし",
+    Color_Space: Literal["RGB", "Gray"] = "RGB",
+    Color_Density: Literal["なし", "線形濃度変換", "ヒストグラム平坦化"] = "なし",
+    Binarization: Literal["なし", "Global", "Otsu", "Adaptive", "Two"] = "なし",
     LowerThreshold: int = 10,
     UpperThreshold: int = 150,
-    AdaptiveThreshold_type: Literal["Mean", "Gaussian", "Wellner"]="Mean",
-    AdaptiveThreshold_BlockSize: int=11,
-    AdaptiveThreshold_Constant: int=2,
-    color: int=4) -> Tuple[int, np.ndarray, np.ndarray]:
+    AdaptiveThreshold_type: Literal["Mean", "Gaussian", "Wellner"] = "Mean",
+    AdaptiveThreshold_BlockSize: int = 11,
+    AdaptiveThreshold_Constant: int = 2,
+    color: int = 4,
+) -> Tuple[int, np.ndarray, np.ndarray]:
     dst_org = dst_bin = None
     response, dst_org = Snapshot(cam)
 
     if response != 3:
-        return 4, [] # WebCam_NotGetImage
+        return 4, []  # WebCam_NotGetImage
 
     err, _, dst_bin = ImageCvt(
         dst_org,
@@ -274,66 +276,73 @@ def SnapshotCvt(
         AdaptiveThreshold_type=AdaptiveThreshold_type,
         AdaptiveThreshold_BlockSize=AdaptiveThreshold_BlockSize,
         AdaptiveThreshold_Constant=AdaptiveThreshold_Constant,
-        color=color
+        color=color,
     )
 
     return err, dst_org, dst_bin
 
+
 def Contours(
-    img: np.ndarray,
+    rgb_img: np.ndarray,
+    bin_img: np.ndarray,
     CalcCOG: Literal["画像から重心を計算", "輪郭から重心を計算"],
     Retrieval: Literal["親子関係を無視する", "最外の輪郭を検出する", "2つの階層に分類する", "全階層情報を保持する"],
     Approximate: Literal["中間点を保持する", "中間点を保持しない"],
-    drawing_figure: bool = True
-    ):
-        """スナップショットの撮影からオブジェクトの重心位置計算までの一連の画像処理を行う関数。
+    orientation: bool = False,
+    drawing_figure: bool = True,
+) -> Tuple[Union[List[float], None], np.ndarray]:
+    """スナップショットの撮影からオブジェクトの重心位置計算までの一連の画像処理を行う関数。
 
-        Args:
-            img(np.ndarray): 重心計算対象の二値画像．
-            CalcCOG(Literal["画像から重心を計算", "輪郭から重心を計算"]): 重心位置の計算対象を指定．
-            Retrieval(Literal["親子関係を無視する", "最外の輪郭を検出する", "2つの階層に分類する", "全階層情報を保持する"]): 2値画像の画素値が 255 の部分と 0 の部分を分離した際に，その親子関係を保持するか指定．
-            Approximate(Literal["中間点を保持する", "中間点を保持しない"]): 輪郭の中間点を保持するか指定．
-            drawing_figure(bool): 図を描画する．Default to True.
-        Returns:
-            COG(list): COG=[x, y], オブジェクトの重心位置
-        """
-        COG = []
-        CalcCOGMode = {
-            "画像から重心を計算": 0,
-            "輪郭から重心を計算": 1,
-        }
-        # 輪郭情報
-        RetrievalMode = {
-            "親子関係を無視する": cv2.RETR_LIST,
-            "最外の輪郭を検出する": cv2.RETR_EXTERNAL,
-            "2つの階層に分類する": cv2.RETR_CCOMP,
-            "全階層情報を保持する": cv2.RETR_TREE,
-        }
-        # 輪郭の中間点情報
-        ApproximateMode = {
-            "中間点を保持する": cv2.CHAIN_APPROX_NONE,
-            "中間点を保持しない": cv2.CHAIN_APPROX_SIMPLE,
-        }
+    Args:
+        rgb_img (np.ndarray): 計算された重心位置を重ねて表示するRGB画像
+        bin_img (np.ndarray): 重心計算対象の二値画像．
+        CalcCOG (Literal["画像から重心を計算", "輪郭から重心を計算"]): 重心位置の計算対象を指定．
+        Retrieval (Literal["親子関係を無視する", "最外の輪郭を検出する", "2つの階層に分類する", "全階層情報を保持する"]): 2値画像の画素値が 255 の部分と 0 の部分を分離した際に，その親子関係を保持するか指定．
+        Approximate (Literal["中間点を保持する", "中間点を保持しない"]): 輪郭の中間点を保持するか指定．
+        orientation (bool, optional): オブジェクトの輪郭情報に基づいて姿勢を推定する関数．
+        `cal_Method = 1` の場合のみ適用可能．Default to False.
+        drawing_figure (bool, optional): 図を描画する．Default to True.
+    Returns:
+        COG(List[float]): COG=[x, y, angle], オブジェクトの重心座標と，そのオブジェクトの2D平面での回転角度．
+        rgb_img (np.ndarray): [W, H, C] の rgb画像．
+    """
+    COG = []
+    CalcCOGMode = {
+        "画像から重心を計算": 0,
+        "輪郭から重心を計算": 1,
+    }
+    # 輪郭情報
+    RetrievalMode = {
+        "親子関係を無視する": cv2.RETR_LIST,
+        "最外の輪郭を検出する": cv2.RETR_EXTERNAL,
+        "2つの階層に分類する": cv2.RETR_CCOMP,
+        "全階層情報を保持する": cv2.RETR_TREE,
+    }
+    # 輪郭の中間点情報
+    ApproximateMode = {
+        "中間点を保持する": cv2.CHAIN_APPROX_NONE,
+        "中間点を保持しない": cv2.CHAIN_APPROX_SIMPLE,
+    }
 
-
-        if type(img) != np.ndarray:
-            raise TypeError("入力はnumpy配列を使用してください．")
-        elif img.max == 0:
-            raise ValueError("画像にオブジェクトが映っていません．")
-        try:
-            COG, img = CenterOfGravity(
-                bin_img=img,
-                RetrievalMode=RetrievalMode[Retrieval],
-                ApproximateMode=ApproximateMode[Approximate],
-                min_area=100,
-                cal_Method=CalcCOGMode[CalcCOG],
-                drawing_figure=drawing_figure
-            )
-        except Exception as e:
-            print("Gravity center position calculation error")
-        finally:
-            return COG, img
-
+    if type(bin_img) != np.ndarray:
+        raise TypeError("入力はnumpy配列を使用してください．")
+    elif bin_img.max == 0:
+        raise ValueError("画像にオブジェクトが映っていません．")
+    try:
+        COG, rgb_img = CenterOfGravity(
+            rgb_img=rgb_img,
+            bin_img=bin_img,
+            RetrievalMode=RetrievalMode[Retrieval],
+            ApproximateMode=ApproximateMode[Approximate],
+            min_area=100,
+            cal_Method=CalcCOGMode[CalcCOG],
+            orientation=orientation,
+            drawing_figure=drawing_figure,
+        )
+    except Exception as e:
+        print(f"Gravity center position calculation error: {e}")
+    finally:
+        return COG, rgb_img
 
 
 if __name__ == "__main__":
