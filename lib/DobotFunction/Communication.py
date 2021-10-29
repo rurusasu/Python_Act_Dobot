@@ -17,17 +17,12 @@ from timeout_decorator import timeout, TimeoutError
 
 
 CON_STR = {
-            dType.DobotConnect.DobotConnect_NoError: "DobotConnect_NoError",
-            dType.DobotConnect.DobotConnect_NotFound: "DobotConnect_NotFound",
-            dType.DobotConnect.DobotConnect_Occupied: "DobotConnect_Occupied",
-        }
-
-HomePoint = {
-    "x": 200,
-    "y": 0,
-    "z": 0,
-    "r": 0
+    dType.DobotConnect.DobotConnect_NoError: "DobotConnect_NoError",
+    dType.DobotConnect.DobotConnect_NotFound: "DobotConnect_NotFound",
+    dType.DobotConnect.DobotConnect_Occupied: "DobotConnect_Occupied",
 }
+
+HomePoint = {"x": 200, "y": 0, "z": 0, "r": 0}
 
 # 関節座標系における各モータの速度および加速度の初期値
 ptpJointParams = {
@@ -38,7 +33,7 @@ ptpJointParams = {
     "j3Velocity": 200,
     "j3Acceleration": 200,
     "j4Velocity": 200,
-    "j4Acceleration": 200
+    "j4Acceleration": 200,
 }
 
 # デカルト座標系における各モータの速度および加速度の初期値
@@ -52,14 +47,14 @@ ptpCoordinateParams = {
 ptpMoveModeDict = {
     "JumpCoordinate": dType.PTPMode.PTPJUMPXYZMode,
     "MoveJCoordinate": dType.PTPMode.PTPMOVJXYZMode,
-    "MoveLCoordinate": dType.PTPMode.PTPMOVLXYZMode
+    "MoveLCoordinate": dType.PTPMode.PTPMOVLXYZMode,
 }
 
 
 # -----------------
 # Dobotの初期化
 # -----------------
-def Connect_Disconnect(connection_flag: bool, api, CON_STR: tuple=CON_STR):
+def Connect_Disconnect(connection_flag: bool, api, CON_STR: tuple = CON_STR):
     """Dobotを接続状態を制御する関数
 
     Args:
@@ -78,7 +73,7 @@ def Connect_Disconnect(connection_flag: bool, api, CON_STR: tuple=CON_STR):
 
     # Dobotがすでに接続されていた場合
     if connection_flag:
-        dType.DisconnectDobot(api) # DobotDisconnect
+        dType.DisconnectDobot(api)  # DobotDisconnect
         print("Dobotとの接続を解除しました．")
         rec, err = False, 1
 
@@ -87,28 +82,31 @@ def Connect_Disconnect(connection_flag: bool, api, CON_STR: tuple=CON_STR):
         portName = dType.SearchDobot(api, maxLen=128)
         try:
             # if ("COM3" in portName) or ("COM4" in portName):
-            if ("COM3" in portName):
+            if "COM3" in portName:
                 char_size = 115200
                 state = dType.ConnectDobot(api, "COM3", char_size)
                 # 接続時にエラーが発生しなかった場合
                 if CON_STR[state[0]] == "DobotConnect_NoError":
                     print("Dobotに通信速度 {} で接続されました．".format(char_size))
-                    initDobot(api) # Dobotの初期設定を行う
-                    rec , err = True, state[0]
+                    initDobot(api)  # Dobotの初期設定を行う
+                    rec, err = True, state[0]
 
                 elif CON_STR[state[0]] == "DobotConnect_NotFound":
                     print("Dobot を見つけることができません！")
-                    rec, err =  False, state[0]
+                    rec, err = False, state[0]
 
                 elif CON_STR[state[0]] == "DobotConnect_Occupied":
                     print(
-                        "Dobot が占有されています。接続するには、アプリケーションを再起動する、Dobot 背面の Reset ボタンを押す、接続USBケーブルを再接続する、のどれかを行う必要があります。")
+                        "Dobot が占有されています。接続するには、アプリケーションを再起動する、Dobot 背面の Reset ボタンを押す、接続USBケーブルを再接続する、のどれかを行う必要があります。"
+                    )
                     rec, err = False, state[0]
                 else:
                     dType.DisconnectDobot(api)
                     raise Exception("接続時に予期せぬエラーが発生しました！！")
             else:
-                raise Exception("Dobotがハードウェア上で接続されていない可能性があります。接続されている場合は、portNameに格納されている変数を確認してください。")
+                raise Exception(
+                    "Dobotがハードウェア上で接続されていない可能性があります。接続されている場合は、portNameに格納されている変数を確認してください。"
+                )
         except Exception as e:
             print(e)
         finally:
@@ -127,16 +125,10 @@ def initDobot(api):
 
     # Home Params の設定
     dType.SetHOMEParams(
-        api,
-        HomePoint["x"],
-        HomePoint["y"],
-        HomePoint["z"],
-        HomePoint["r"],
-        isQueued=1
+        api, HomePoint["x"], HomePoint["y"], HomePoint["z"], HomePoint["r"], isQueued=1
     )  # Async Motion Params Setting
     dType.SetHOMECmd(api, temp=0, isQueued=1)  # Async Home
 
-    #time.sleep(20) # 初期位置への移動待ち
     # JOGパラメータの設定
     dType.SetJOGJointParams(
         api, 200, 200, 200, 200, 200, 200, 200, 200, isQueued=1
@@ -161,11 +153,11 @@ def initDobot(api):
         j3Acceleration=ptpJointParams["j3Acceleration"],
         j4Velocity=ptpJointParams["j4Velocity"],
         j4Acceleration=ptpJointParams["j4Acceleration"],
-        isQueued=1
+        isQueued=1,
     )
 
     params = dType.GetPTPJointParams(api)
-    s = '''\
+    s = """\
     起動直後のMagicianの関節座標系における各モータの速度および加速度
     j1Velocity = {}
     j1Acceleration = {}
@@ -175,15 +167,19 @@ def initDobot(api):
     j3Acceleration = {}
     j4Velocity = {}
     j4Acceleration = {}
-    '''
-    print(s.format(params[0],
-                         params[1],
-                         params[2],
-                         params[3],
-                         params[4],
-                         params[5],
-                         params[6],
-                         params[7]))
+    """
+    print(
+        s.format(
+            params[0],
+            params[1],
+            params[2],
+            params[3],
+            params[4],
+            params[5],
+            params[6],
+            params[7],
+        )
+    )
 
     # デカルト座標系での各方向への速度および加速度の設定
     dType.SetPTPCoordinateParams(
@@ -192,30 +188,26 @@ def initDobot(api):
         xyzAcceleration=ptpCoordinateParams["xyzAcceleration"],
         rVelocity=ptpCoordinateParams["rVelocity"],
         rAcceleration=ptpCoordinateParams["rAcceleration"],
-        isQueued=1
+        isQueued=1,
     )
 
     params = dType.GetPTPCoordinateParams(api)
-    s = '''\
+    s = """\
     起動直後のMagicianのデカルト座標系における各モータの速度および加速度
     xyzVelocity = {}
     xyzAcceleration = {}
     rVelocity = {}
     rAcceleration = {}
-    '''
-    print(s.format(params[0],
-                         params[1],
-                         params[2],
-                         params[3]))
+    """
+    print(s.format(params[0], params[1], params[2], params[3]))
 
     # PTP動作の速度、加速度の比率を設定
     lastIndex = dType.SetPTPCommonParams(api, 100, 100, isQueued=1)[0]
 
-    #Wait for Executing Last Command
+    # Wait for Executing Last Command
     while lastIndex > dType.GetQueuedCmdCurrentIndex(api)[0]:
         pass
     return None
-
 
 
 # -----------------------------------
@@ -224,16 +216,16 @@ def initDobot(api):
 # 直交座標系での動作
 def Operation(api, file_name, axis, volume=1, initPOS=None):
     """
-        A function that sends a motion command in any direction
+    A function that sends a motion command in any direction
 
-        Parameters
-        ----------
-        api : CDLL
-        axis : str
-            移動方向
-        volume : int
-            移動量
-        """
+    Parameters
+    ----------
+    api : CDLL
+    axis : str
+        移動方向
+    volume : int
+        移動量
+    """
     axis_list = ["x", "y", "z", "r"]
     if initPOS != None:
         pose = initPOS
@@ -303,49 +295,51 @@ def __Act(api, lastIndex):
 
     # Wait for Executing Last Command
     while lastIndex > dType.GetQueuedCmdCurrentIndex(api)[0]:
-        dType.dSleep(100)
+        pass
 
     # キューに入っているコマンドを停止
     dType.SetQueuedCmdStopExec(api)
 
 
-def SetPoseAct(api,  pose: dict, ptpMoveMode: str, queue_index: int=1):
-        """デカルト座標系で指定された位置にアームの先端を移動させる関数
+def SetPoseAct(api, pose: dict, ptpMoveMode: str, queue_index: int = 1):
+    """デカルト座標系で指定された位置にアームの先端を移動させる関数
 
-        Arg:
-            api(dtype): DobotAPIのコンストラクタ
-            pose(dict): デカルト座標系および関節座標系で指定された姿勢データ
-            ptpMoveMode(str): 各座標系におけるDobotの制御方法
-            queue_index(int): データをQueueとして送るか。default to 0
-            * 0: 送らない
-            * 1: 送る
+    Arg:
+        api(dtype): DobotAPIのコンストラクタ
+        pose(dict): デカルト座標系および関節座標系で指定された姿勢データ
+        ptpMoveMode(str): 各座標系におけるDobotの制御方法
+        queue_index(int): データをQueueとして送るか。default to 0
+        * 0: 送らない
+        * 1: 送る
 
-        Return:
-            response(int):
-                0 : 応答あり
-                1 : 応答なし
-        """
-        response = ''
-        try:
-            for ptpmode in ptpMoveModeDict:
-                if ptpMoveMode in ptpmode:
-                    response = ptpMoveModeDict[ptpMoveMode]
-                    break
-            if (not response) and (response != 0):
-                raise ValueError("指定された制御方法は存在しません。")
-        except (ValueError, TypeError) as e:
-            traceback.print_exc()
-        else:
-            dType.SetPTPCmd(api,
-                                        ptpMoveModeDict[ptpMoveMode],
-                                        pose["x"],
-                                        pose["y"],
-                                        pose["z"],
-                                        pose["r"],
-                                        queue_index
-                )
-            time.sleep(2)
-        return 0
+    Return:
+        response(int):
+            0 : 応答あり
+            1 : 応答なし
+    """
+    response = ""
+    try:
+        for ptpmode in ptpMoveModeDict:
+            if ptpMoveMode in ptpmode:
+                response = ptpMoveModeDict[ptpMoveMode]
+                break
+        if (not response) and (response != 0):
+            raise ValueError("指定された制御方法は存在しません。")
+    except (ValueError, TypeError) as e:
+        traceback.print_exc()
+    else:
+        lastIndex = dType.SetPTPCmd(
+            api,
+            ptpMoveModeDict[ptpMoveMode],
+            pose["x"],
+            pose["y"],
+            pose["z"],
+            pose["r"],
+            queue_index,
+        )[0]
+        while lastIndex > dType.GetQueuedCmdCurrentIndex(api)[0]:
+            pass
+    return 0
 
 
 def GripperAutoCtrl(api) -> None:
@@ -357,7 +351,7 @@ def GripperAutoCtrl(api) -> None:
     Return:
         None
     """
-    sleep_time = 2 #[second]
+    sleep_time = 0.7  # [second]
     [value] = dType.GetEndEffectorGripper(api)
     # --------------------------- #
     # グリッパが閉じている場合 #
@@ -384,10 +378,7 @@ def GripperAutoCtrl(api) -> None:
 
 
 def _GripperOpenClose(
-    api,
-    motorCtrl: bool=False,
-    gripperCtrl: bool=True,
-    queue_index: int=0
+    api, motorCtrl: bool = False, gripperCtrl: bool = True, queue_index: int = 0
 ) -> None:
     """グリッパーを開閉する関数
 
@@ -405,7 +396,9 @@ def _GripperOpenClose(
 
     Return: None
     """
-    dType.SetEndEffectorGripper(api, motorCtrl, gripperCtrl, queue_index)
+    lastIndex = dType.SetEndEffectorGripper(api, motorCtrl, gripperCtrl, queue_index)[0]
+    while lastIndex > dType.GetQueuedCmdCurrentIndex(api)[0]:
+        pass
 
 
 # ----------------------------------
@@ -413,14 +406,13 @@ def _GripperOpenClose(
 # ----------------------------------
 def csv_write(filename, data):
     """Write Data to csv file"""
-    if data == None:  # 書き込むデータが無いとき
+    if data is not None:  # 書き込むデータが無いとき
         return
     array = [str(row) for row in data]
     with open(filename, "a", encoding="utf_8", errors="", newline="") as f:
         # ファイルへの書き込みを行う
-        if _wirte(f, array) == None:
-            print("x=%f,  y=%f,  z=%f,  r=%f" %
-                  (data[0], data[1], data[2], data[3]))
+        if _wirte(f, array) is not None:
+            print("x=%f,  y=%f,  z=%f,  r=%f" % (data[0], data[1], data[2], data[3]))
             # print('書き込みが完了しました。')
         else:
             print("ファイルの書き込みに失敗しました。")
@@ -450,8 +442,8 @@ if __name__ == "__main__":
     # ---------------------------- #
     # Dobot の接続ポートの確認 #
     # ---------------------------- #
-    #portName = dType.SearchDobot(api, maxLen=128)
-    #print(portName)
+    # portName = dType.SearchDobot(api, maxLen=128)
+    # print(portName)
 
     # ------------------- #
     # Dobot のコネクト #
@@ -487,8 +479,8 @@ if __name__ == "__main__":
     print("Gripper CLOSE Motor OFF: {}".format(value))
     """
 
-    #GripperAutoCtrl(api)
-    #GripperAutoCtrl(api)
+    # GripperAutoCtrl(api)
+    # GripperAutoCtrl(api)
 
     pose = {
         "x": 193,
@@ -502,6 +494,6 @@ if __name__ == "__main__":
     }
 
     ptpMoveMode = "JumpCoordinate"
-    #ptpMoveMode = "MoveJCoordinate"
+    # ptpMoveMode = "MoveJCoordinate"
 
     SetPoseAct(api, pose, ptpMoveMode)
