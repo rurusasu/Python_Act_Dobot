@@ -1,5 +1,5 @@
 import sys, os
-from typing import List, Tuple
+from typing import Dict, List, Tuple, Union
 
 sys.path.append(".")
 sys.path.append("..")
@@ -35,6 +35,17 @@ from lib.config.config import cfg
 # from ..DobotDLL
 
 # from PIL import Image
+
+_Dobot_err = {
+    0: "DobotAct_NoError",
+    1: "DobotConnect_NotFound",
+    2: "DobotConnect_Occupied",
+    3: "DobotAct_Timeout",
+    4: "Set LeftUp Setting Error",
+    5: "Set RightDown Setting Error",
+    6: "Set Retreat position Setting Error",
+}
+
 _WebCam_err = {
     0: "WebCam_Connect",
     1: "WebCam_Release",
@@ -81,12 +92,6 @@ class Dobot_APP:
         # --- エンドエフェクタ --- #
         self.MotorON = False  # 吸引用モータを制御
         # --- エラーフラグ --- #
-        self.Dobot_err = {
-            0: "DobotAct_NoError",
-            1: "DobotConnect_NotFound",
-            2: "DobotConnect_Occupied",
-            3: "DobotAct_Timeout",
-        }
         self.act_err = 0  # State: 0, Err: -1
         self.preview = False  # プレビューを画面上に表示するフラグ．True: 表示する．
         self.preview_cam = None
@@ -129,7 +134,7 @@ class Dobot_APP:
             [sg.Button("Gripper Open/Close", key="-Gripper-")],
         ]
 
-        # タスク1
+        # タスク
         Task = [
             [
                 sg.Button("タスク実行", size=(9, 1), disabled=True, key="-Task-"),
@@ -268,12 +273,30 @@ class Dobot_APP:
                 sg.InputText("", size=(5, 1), key="-CoordinatePose_R-"),
             ],
         ]
-
-        # 画像上の位置とDobotの座標系との位置合わせを行うGUI
+        # ----------------------------------------
+        # キャリブレーションセッティング部分
+        # ----------------------------------------
         Alignment = [
             [
                 sg.Button(
                     button_text="MoveToThePoint", size=(16, 1), key="-MoveToThePoint-"
+                ),
+                sg.Text(
+                    "OffSet",
+                    size=(5, 1),
+                    pad=(0, 0),
+                ),
+                sg.InputText(
+                    default_text="43",
+                    size=(2, 1),
+                    disabled=False,
+                    key="-offset-",
+                    pad=(0, 0),
+                ),
+                sg.Text(
+                    "[mm]",
+                    size=(5, 1),
+                    pad=(0, 0),
                 ),
             ],
             [
@@ -939,10 +962,10 @@ class Dobot_APP:
         elif event == "-SetJointPose-":
             # 移動後の関節角度を指定
             joint_pose = [
-                float(values["-JointPoseInput_1-"]),
-                float(values["-JointPoseInput_2-"]),
-                float(values["-JointPoseInput_3-"]),
-                float(values["-JointPoseInput_4-"]),
+                float(values["-JointPose1-"]),
+                float(values["-JointPose2-"]),
+                float(values["-JointPose3-"]),
+                float(values["-JointPose4-"]),
             ]
             response = self.SetJointPose_click(joint_pose)
             print(response)
@@ -1153,6 +1176,7 @@ class Dobot_APP:
 
                 # どのラジオボタンもアクティブでない場合 -> カメラが1つも接続されていない場合．
                 if cam is None:
+                    sg.popup(_WebCam_err[2], title="カメラ接続エラー")
                     return
 
                 # <<< キャリブレーション座標の存在判定 <<< #
@@ -1185,6 +1209,7 @@ class Dobot_APP:
 
                 # どのラジオボタンもアクティブでない場合 -> カメラが1つも接続されていない場合．
                 if cam is None:
+                    sg.popup(_WebCam_err[2], title="カメラ接続エラー")
                     return
 
                 # <<< キャリブレーション座標の存在判定 <<< #
@@ -1217,14 +1242,44 @@ class Dobot_APP:
 
                 # どのラジオボタンもアクティブでない場合 -> カメラが1つも接続されていない場合．
                 if cam is None:
+                    sg.popup(_WebCam_err[2], title="カメラ接続エラー")
                     return
 
                 # タスク実行
                 self.Task3(cam, values)
 
             elif values["-TaskNum-"] == "Task_4":
+                # ------------------------------------------------#
+                # Task 4                                                     #
+                # オブジェクトの重心位置の真上まで VF で移動 #
+                # ------------------------------------------------#
                 # <<< カメラの接続判定 <<< #
-                main_cam, sub_cam = None
+                cam = None
+                if values["-WebCamChoice-"]:
+                    if values["-main_cam_0-"]:
+                        cam = _CamList["0"]["cam_object"]
+                    elif values["-main_cam_1-"]:
+                        cam = _CamList["1"]["cam_object"]
+                else:
+                    sg.popup("ラジオボタン: Camera が選択されていません．")
+                    return
+
+                # どのラジオボタンもアクティブでない場合 -> カメラが1つも接続されていない場合．
+                if cam is None:
+                    sg.popup(_WebCam_err[2], title="カメラ接続エラー")
+                    return
+
+                # オブジェクトの退避先が設定されていない場合
+                if not self.RecordPose:
+                    sg.popup("オブジェクトの退避位置が設定されていません。", title=_Dobot_err[6])
+                    return
+
+                # タスク実行
+                self.Task4(cam, values)
+
+            elif values["-TaskNum-"] == "Task_5":
+                # <<< カメラの接続判定 <<< #
+                main_cam, sub_cam = None, None
                 # 2つのカメラが使用可能か判定
                 if (
                     _CamList["0"]["cam_object"] != None
@@ -1590,6 +1645,31 @@ class Dobot_APP:
         self.fig_agg = draw_figure(canvas, fig)
         self.fig_agg.draw()
 
+    def OffSet(self, values: list) -> Union[Dict[str, float], None]:
+        """
+        内視鏡の中心位置にエンドエフェクタの中心位置を移動させる際の、(X, Y) 方向の距離を計算する関数．
+
+        Args:
+            values (list): ウインドウ上のボタンの状態などを記録している変数．
+
+        Returns:
+            Union[Dict[str, float], None]: ロボット座標系における (X, Y) 方向の移動距離
+            * No Error: {"x": float, "y": float}
+            * Error: {"x": None, "y": None}
+        """
+        offset = int(values["-offset-"])
+        j1 = self.CurrentPose["joint1Angle"]
+        if offset > 0:
+            return_param = {"x": None, "y": None}
+            rob_x = offset * np.cos(np.radians(j1))
+            rob_y = offset * np.sin(np.radians(j1))
+
+            return_param["x"] = rob_x
+            return_param["y"] = rob_y
+            return return_param
+        else:
+            return None
+
     def Task1(self, cam: cv2.VideoCapture, values: list):
         """
         Task1 実行関数。
@@ -1802,7 +1882,7 @@ class Dobot_APP:
             self.connection
             and (type(cam) == cv2.VideoCapture)
             and (values["-Binarization-"] != "なし")
-            and (self.RecordPose is not None)
+            and (self.RecordPose)
         ):
             try:
                 vf = VisualFeedback(self.api, cam, values)
@@ -1828,6 +1908,16 @@ class Dobot_APP:
                 sg.popup("VF の戻り値が正常に取得できませんでした．")
                 return
 
+            # Dobotをオブジェクト重心の真上まで移動させる。
+            offset = self.OffSet(values)
+            if offset is not None:
+                pose["x"] += offset["x"]
+                pose["y"] += offset["y"]
+            SetPoseAct(self.api, pose=pose, ptpMoveMode=values["-MoveMode-"])
+            # エンドエフェクタを推定した角度に回転する．
+            if data["COG"][2] is not None:
+                pose["r"] = data["COG"][2] - 90
+                SetPoseAct(self.api, pose=pose, ptpMoveMode=values["-MoveMode-"])
             # グリッパーを開く。
             GripperAutoCtrl(self.api)
             # DobotをZ=-35の位置まで降下させる。
@@ -1860,6 +1950,7 @@ class Dobot_APP:
             GripperAutoCtrl(self.api)
             # グリッパを初期位置まで移動させる．
             SetPoseAct(self.api, pose=init_pose, ptpMoveMode=values["-MoveMode-"])
+
         else:
             sg.popup("Dobotかカメラが接続されていない。もしくは，画像が二値化されていません．")
             return

@@ -213,6 +213,7 @@ class VisualFeedback(object):
                     CalcCOG=str(values["-CalcCOGMode-"]),
                     Retrieval=str(values["-RetrievalMode-"]),
                     Approximate=str(values["-ApproximateMode-"]),
+                    orientation=True,
                     drawing_figure=False,
                 )
 
