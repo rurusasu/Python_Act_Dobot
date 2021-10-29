@@ -1775,12 +1775,17 @@ class Dobot_APP:
             else:
                 data = vf.run(target="vf")
 
-            if data["pose"] is not None:
+            if (
+                data is not None
+                and data["pose"] is not None
+                and data["COG"] is not None
+            ):
                 self.current_pose = data["pose"]
-
-            if data["COG"]:
                 self.Window["-CenterOfGravity_x-"].update(str(data["COG"][0]))
                 self.Window["-CenterOfGravity_y-"].update(str(data["COG"][1]))
+            else:
+                sg.popup("VF の戻り値が正常に取得できませんでした．")
+                return
         else:
             sg.popup("Dobotかカメラが接続されていない。もしくは，画像が二値化されていません．")
             return
@@ -1797,6 +1802,7 @@ class Dobot_APP:
             self.connection
             and (type(cam) == cv2.VideoCapture)
             and (values["-Binarization-"] != "なし")
+            and (self.RecordPose is not None)
         ):
             try:
                 vf = VisualFeedback(self.api, cam, values)
@@ -1806,14 +1812,54 @@ class Dobot_APP:
             else:
                 data = vf.run(target="vf")
 
-            if data["pose"] is not None:
-                self.current_pose = data["pose"]
-
-            if data["COG"]:
+            if (
+                data is not None
+                and data["pose"] is not None
+                and data["COG"] is not None
+            ):
+                # 最終的に戻ってくる初期位置を保持
+                init_pose = self.GetPose_UpdateWindow()  # pose -> self.CurrentPose
+                # 現在のDobotの姿勢を取得
+                pose = self.GetPose_UpdateWindow()  # pose -> self.CurrentPose
                 self.Window["-CenterOfGravity_x-"].update(str(data["COG"][0]))
                 self.Window["-CenterOfGravity_y-"].update(str(data["COG"][1]))
+                self.Window["-Angle-"].update(str(data["COG"][2]))
+            else:
+                sg.popup("VF の戻り値が正常に取得できませんでした．")
+                return
 
-            
+            # グリッパーを開く。
+            GripperAutoCtrl(self.api)
+            # DobotをZ=-35の位置まで降下させる。
+            pose["z"] = self.RecordPose["z"]
+            SetPoseAct(self.api, pose=pose, ptpMoveMode=values["-MoveMode-"])
+            # グリッパを閉じる。
+            GripperAutoCtrl(self.api)
+            # DobotをZ=20の位置まで上昇させる。
+            # pose["z"] = self.CurrentPose["z"]
+            pose["z"] = 20
+            SetPoseAct(self.api, pose=pose, ptpMoveMode=values["-MoveMode-"])
+            # 退避位置まで移動させる。
+            pose = self.RecordPose.copy()
+            # DobotをZ=20の位置まで上昇させる。
+            pose["z"] = 20
+            SetPoseAct(
+                self.api,
+                pose=pose,
+                ptpMoveMode=values["-MoveMode-"],
+            )
+            # DobotをZ=-35の位置まで降下させる。
+            pose["z"] = self.RecordPose["z"]
+            SetPoseAct(self.api, pose=pose, ptpMoveMode=values["-MoveMode-"])
+            # グリッパを開く．
+            GripperAutoCtrl(self.api)
+            # DobotをZ=20の位置まで上昇させる。
+            pose["z"] = 20
+            SetPoseAct(self.api, pose=pose, ptpMoveMode=values["-MoveMode-"])
+            # グリッパを閉じる．
+            GripperAutoCtrl(self.api)
+            # グリッパを初期位置まで移動させる．
+            SetPoseAct(self.api, pose=init_pose, ptpMoveMode=values["-MoveMode-"])
         else:
             sg.popup("Dobotかカメラが接続されていない。もしくは，画像が二値化されていません．")
             return

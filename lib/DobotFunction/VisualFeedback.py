@@ -1,7 +1,7 @@
 import time
 import sys
 from queue import Queue
-from typing import Literal
+from typing import Dict, List, Literal, Union
 from threading import Thread
 
 sys.path.append("../../")
@@ -134,12 +134,19 @@ class VisualFeedback(object):
 
         ui_que.put("動作終了")
 
-    def VF_Control(self, data_que: Queue, ui_que: Queue):
+    def VF_Control(
+        self, data_que: Queue, ui_que: Queue
+    ) -> Dict[Union[Dict[str, float], None], List]:
         """子プロセスの処理
 
         Args:
             data_que (Queue): ワーカープロセスへ送るデータ
             ui_que (Queue): ワーカーから送られてくるデータ
+
+        Returns:
+            return_param (Dict[Union[Dict[str, float], None], List]): VF終了時に返されるデータ．
+            * No Error: {pose: {"x":..., "y":..., "z":..., ,,,}, COG[x(float), y(float)]}
+            * Error: {pose: None, COG[]}
         """
         from lib.DobotDLL import DobotDllType as dType
 
@@ -264,7 +271,6 @@ class VisualFeedback(object):
                     )[0]
                     # Wait for Executing Last Command
                     while lastIndex > dType.GetQueuedCmdCurrentIndex(api)[0]:
-                        # time.sleep(1)
                         pass
 
                 else:
@@ -276,7 +282,20 @@ class VisualFeedback(object):
         finally:
             return ui_que.put(return_param)
 
-    def run(self, target: Literal["test", "test2", "vf"]):
+    def run(
+        self, target: Literal["test", "test2", "vf"]
+    ) -> Union[Dict[Dict[str, float], List[float]], None]:
+        """
+        スレッド処理を実行する関数．
+
+        Args:
+            target (Literal["test", "test_2", "vf"]): 実行するスレッド処理．
+
+        Returns:
+            Union[Dict[Dict[str, float], List[float]], None]: 戻り値．
+            * No Error: {pose: {"x":..., "y":..., "z":..., ,,,}, COG[x(float), y(float)]}
+            * Error: None
+        """
         if target == "test":
             thread_run = Thread(
                 target=self.Test, args=(self.data_que, self.ui_que), daemon=True

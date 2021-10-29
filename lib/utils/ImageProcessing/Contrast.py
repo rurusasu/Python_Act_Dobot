@@ -7,6 +7,7 @@ sys.path.append("../../")
 import cv2
 import numpy as np
 
+
 def Contrast_cvt(src, cvt_type):
     """
     濃度の変換方法を選択する関数
@@ -31,19 +32,20 @@ def Contrast_cvt(src, cvt_type):
 
     new_img = src.copy()
 
-    if cvt_type == '線形濃度変換':  # 線形濃度変換を行う
+    if cvt_type == "線形濃度変換":  # 線形濃度変換を行う
         new_img = _LUT_curve(__curve_1, a, new_img)
-    elif cvt_type == '非線形濃度変換':  # ガンマ補正を行う
+    elif cvt_type == "非線形濃度変換":  # ガンマ補正を行う
         new_img = _LUT_curve(__curve_5, gamma, new_img)
-    elif cvt_type == 'ヒストグラム平坦化':  # ヒストグラム平坦化を行う
+    elif cvt_type == "ヒストグラム平坦化":  # ヒストグラム平坦化を行う
         if len(new_img.shape) == 2:
-        #if color_type == 'glay':  # グレー画像について変換
+            # if color_type == 'glay':  # グレー画像について変換
             new_img = _GlayHist(new_img)
         elif len(new_img.shape) == 3:
-        #elif color_type == 'RGB':  # rgb画像について変換
+            # elif color_type == 'RGB':  # rgb画像について変換
             new_img = _RGBHist(new_img)
-
+            new_img = cv2.cvtColor(new_img, cv2.COLOR_BGR2RGB)
     return new_img
+
 
 def _LUT_curve(f, a: float, rgb_img: np.ndarray) -> np.ndarray:
     """
@@ -59,8 +61,8 @@ def _LUT_curve(f, a: float, rgb_img: np.ndarray) -> np.ndarray:
         dst (np.ndarray): 変換後の画像
 
     """
-    LUT = np.arange(256, dtype='uint8').reshape(-1, 1)
-    LUT = np.array([f(a, x).astype('uint8') for x in LUT])
+    LUT = np.arange(256, dtype="uint8").reshape(-1, 1)
+    LUT = np.array([f(a, x).astype("uint8") for x in LUT])
 
     dst = cv2.LUT(rgb_img, LUT)
 
@@ -71,25 +73,31 @@ def __curve_1(a, x):
     y = a * x
     return y
 
+
 def __curve_2(a, x):
     y = x + a
     return y
 
+
 def __curve_3(a, x):
     y = a * (x - 127.0) + 127.0
     return y
+
 
 def __curve_4(a, x):
     zmin, zmax = 20.0, 220.0
     y = a * (x - zmin) / (zmax - zmin)
     return y
 
+
 def __curve_5(gamma, x):
-    y = 255*(x/255)**(1/gamma)
+    y = 255 * (x / 255) ** (1 / gamma)
     return y
 
 
-def _GlayHist(glay_img: np.ndarray, clip_limit: int = 3, grid: tuple = (8, 8), thresh: int = 225) -> np.ndarray:
+def _GlayHist(
+    glay_img: np.ndarray, clip_limit: int = 3, grid: tuple = (8, 8), thresh: int = 225
+) -> np.ndarray:
     """
     グレー画像に対して適応的ヒストグラム平坦化(Clahe)を行う関数
 
@@ -113,12 +121,14 @@ def _GlayHist(glay_img: np.ndarray, clip_limit: int = 3, grid: tuple = (8, 8), t
     dst = glay_img.copy()
     clahe = cv2.createCLAHE(cliplimit=clip_limit, tileGridSize=grid)
     dst = clahe.apply(dst)
-    #dst = new_img.copy()
+    # dst = new_img.copy()
     dst[dst > thresh] = 255
     return dst
 
 
-def _RGBHist(rgb_img: np.ndarray, clip_limit: int = 3, grid: tuple=(8, 8), thresh: int=225):
+def _RGBHist(
+    rgb_img: np.ndarray, clip_limit: int = 3, grid: tuple = (8, 8), thresh: int = 225
+):
     """
     rgb画像に対して適応的ヒストグラム平坦化(Clahe)を行う関数
 
@@ -140,7 +150,7 @@ def _RGBHist(rgb_img: np.ndarray, clip_limit: int = 3, grid: tuple=(8, 8), thres
             変換後の画像
     """
     dst = rgb_img.copy()
-    clahe = cv2.createCLAHE(cliplimit=clip_limit, tileGridSize=grid)
+    clahe = cv2.createCLAHE(clipLimit=clip_limit, tileGridSize=grid)
     r, g, b = cv2.split(dst)
 
     # r, g, bそれぞれで変換を行う
@@ -148,7 +158,7 @@ def _RGBHist(rgb_img: np.ndarray, clip_limit: int = 3, grid: tuple=(8, 8), thres
     dst_G = clahe.apply(g)
     dst_B = clahe.apply(b)
 
-    th_R, th_G, th_B = dst_R.copy(), dst_G.copy(), dst_B.copy
+    th_R, th_G, th_B = dst_R.copy(), dst_G.copy(), dst_B.copy()
     th_R[dst_R > thresh] = 255
     th_G[dst_G > thresh] = 255
     th_B[dst_B > thresh] = 255
@@ -190,7 +200,7 @@ if __name__ == "__main__":
             elif key == "name":
                 name = value.rstrip(".png") + "_" + cvt_type
 
-    a=0.7
+    a = 0.7
     N = 1000
     x = np.linspace(-5, 5, N)
 
