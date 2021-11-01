@@ -2009,6 +2009,13 @@ class Dobot_APP:
             and (values["-Binarization-"] != "なし")
             and (self.RecordPose)
         ):
+            # 最終的に戻ってくる初期位置を保持
+            # init_pose = self.GetPose_UpdateWindow()  # pose -> self.CurrentPose
+            init_pose = self.InitPose
+            # Dobotを初期位置まで移動させる。
+            SetPoseAct(self.api, pose=init_pose, ptpMoveMode=values["-MoveMode-"])
+
+            # VF Class のインスタンスを作成
             try:
                 vf = VisualFeedback(self.api, sub_cam, values)
             except Exception as e:
@@ -2021,11 +2028,6 @@ class Dobot_APP:
 
             if err == 7 or not COG:
                 return
-            # 最終的に戻ってくる初期位置を保持
-            # init_pose = self.GetPose_UpdateWindow()  # pose -> self.CurrentPose
-            init_pose = self.InitPose
-            # Dobotを初期位置まで移動させる。
-            SetPoseAct(self.api, pose=init_pose, ptpMoveMode=values["-MoveMode-"])
 
             # 現在のDobotの姿勢を取得
             pose = self.GetPose_UpdateWindow()  # pose -> self.CurrentPose

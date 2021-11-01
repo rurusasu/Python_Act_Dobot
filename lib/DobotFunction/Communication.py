@@ -73,9 +73,10 @@ def Connect_Disconnect(connection_flag: bool, api, CON_STR: tuple = CON_STR):
 
     # Dobotがすでに接続されていた場合
     if connection_flag:
-        dType.DisconnectDobot(api)  # DobotDisconnect
+        state = dType.DisconnectDobot(api)  # DobotDisconnect
         print("Dobotとの接続を解除しました．")
         rec, err = False, 1
+        return rec, err
 
     # Dobotが接続されていない場合
     else:
@@ -429,10 +430,10 @@ def _wirte(f, data):
 
 if __name__ == "__main__":
     from DobotDLL import DobotDllType as dType
-    from src.config.config import cfg
+    from lib.config.config import cfg
 
-    dll_path = cfg.DOBOT_DLL_DIR + os.sep + "DobotDll.dll"
-    api = dType.load(dll_path)
+    # dll_path = os.path.join(cfg.DLL_DIR, "DobotDll.dll")
+    api = dType.load()
     CON_STR = {
         dType.DobotConnect.DobotConnect_NoError: "DobotConnect_NoError",
         dType.DobotConnect.DobotConnect_NotFound: "DobotConnect_NotFound",
@@ -454,6 +455,12 @@ if __name__ == "__main__":
     if connection_flag:
         [value] = dType.GetEndEffectorSuctionCup(api)
         print(value)
+
+    # ------------------- #
+    # Dobot の接続解除 #
+    # ------------------- #
+    if connection_flag:
+        connection_flag, result = Connect_Disconnect(connection_flag, api, CON_STR)
 
     """
     # グリッパ: 閉、モータ: OFF -> 1
@@ -496,4 +503,4 @@ if __name__ == "__main__":
     ptpMoveMode = "JumpCoordinate"
     # ptpMoveMode = "MoveJCoordinate"
 
-    SetPoseAct(api, pose, ptpMoveMode)
+    # SetPoseAct(api, pose, ptpMoveMode)
