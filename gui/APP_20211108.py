@@ -32,6 +32,7 @@ from lib.DobotFunction.Communication import (
 )
 from lib.DobotFunction.VisualFeedback import VisualFeedback
 from lib.config.config import cfg
+from lib.utils.base_utils import WriteDataToNdjson
 
 # from ..DobotDLL
 
@@ -77,10 +78,6 @@ class Dobot_APP:
             "y": 0.0,
             "z": 0.0,
             "r": 0.0,
-            "joint1Angle": 0.0,
-            "joint2Angle": 0.0,
-            "joint3Angle": 0.0,
-            "joint4Angle": 0.0,
         }
         self.CurrentPose = {
             "x": 0.0,
@@ -92,7 +89,12 @@ class Dobot_APP:
             "joint3Angle": 0.0,
             "joint4Angle": 0.0,
         }
-        self.RecordPose = {}  # Dobotがオブジェクトを退避させる位置
+        self.RecordPose = {
+            "x": 0.0,
+            "y": 0.0,
+            "z": 0.0,
+            "r": 0.0,
+        }  # Dobotがオブジェクトを退避させる位置
         # カメラ座標系とロボット座標系とのキャリブレーション時の左上の位置座標
         self.Alignment_1 = {
             "x": None,
@@ -175,6 +177,30 @@ class Dobot_APP:
                     disabled=False,
                     key="-Ki-",
                     readonly=False,
+                ),
+            ],
+        ]
+
+        save_config = [
+            [
+                sg.Input(size=(30, 1), key="-save_cfg_path-", disabled=True),
+                sg.FileSaveAs(
+                    file_types="json",
+                    change_submits=True,
+                    enable_events=True,
+                    disabled=False,
+                    key="-load_cfg_path-",
+                    initial_folder="/tmp",
+                ),
+            ],
+            [
+                sg.Input(size=(30, 1), disabled=True),
+                sg.FileBrowse(
+                    button_text="Loadfile path of Config",
+                    change_submits=True,
+                    enable_events=True,
+                    disabled=False,
+                    key="-load_cfg_path-",
                 ),
             ],
         ]
@@ -323,11 +349,17 @@ class Dobot_APP:
                     default_text="", size=(5, 1), disabled=False, key="-x_init-"
                 ),
                 sg.Text("X0", size=(2, 1)),
-                sg.InputText(default_text="", size=(5, 1), disabled=False, key="-x0-"),
+                sg.InputText(
+                    default_text="", size=(5, 1), disabled=False, key="-Retreat_x-"
+                ),
                 sg.Text("X1", size=(2, 1)),
-                sg.InputText(default_text="", size=(5, 1), disabled=False, key="-x1-"),
+                sg.InputText(
+                    default_text="", size=(5, 1), disabled=False, key="-Alignment_x1-"
+                ),
                 sg.Text("X2", size=(2, 1)),
-                sg.InputText(default_text="", size=(5, 1), disabled=False, key="-x2-"),
+                sg.InputText(
+                    default_text="", size=(5, 1), disabled=False, key="-Alignment_x2-"
+                ),
             ],
             [
                 sg.Text("YInit", size=(3, 1)),
@@ -335,11 +367,17 @@ class Dobot_APP:
                     default_text="", size=(5, 1), disabled=False, key="-y_init-"
                 ),
                 sg.Text("Y0", size=(2, 1)),
-                sg.InputText(default_text="", size=(5, 1), disabled=False, key="-y0-"),
+                sg.InputText(
+                    default_text="", size=(5, 1), disabled=False, key="-Retreat_y-"
+                ),
                 sg.Text("Y1", size=(2, 1)),
-                sg.InputText(default_text="", size=(5, 1), disabled=False, key="-y1-"),
+                sg.InputText(
+                    default_text="", size=(5, 1), disabled=False, key="-Alignment_y1-"
+                ),
                 sg.Text("Y2", size=(2, 1)),
-                sg.InputText(default_text="", size=(5, 1), disabled=False, key="-y2-"),
+                sg.InputText(
+                    default_text="", size=(5, 1), disabled=False, key="-Alignment_y2-"
+                ),
             ],
             [
                 sg.Text("ZInit", size=(3, 1)),
@@ -347,7 +385,9 @@ class Dobot_APP:
                     default_text="", size=(5, 1), disabled=False, key="-z_init-"
                 ),
                 sg.Text("Z0", size=(2, 1)),
-                sg.InputText(default_text="", size=(5, 1), disabled=False, key="-z0-"),
+                sg.InputText(
+                    default_text="", size=(5, 1), disabled=False, key="-Retreat_z-"
+                ),
             ],
             [
                 sg.Text("RInit", size=(3, 1)),
@@ -355,7 +395,9 @@ class Dobot_APP:
                     default_text="", size=(5, 1), disabled=False, key="-r_init-"
                 ),
                 sg.Text("R0", size=(2, 1)),
-                sg.InputText(default_text="", size=(5, 1), disabled=False, key="-r0-"),
+                sg.InputText(
+                    default_text="", size=(5, 1), disabled=False, key="-Retreat_r-"
+                ),
             ],
         ]
 
@@ -797,6 +839,7 @@ class Dobot_APP:
                 sg.Col(EndEffector),
                 sg.Col(Task),
             ],
+            [sg.Frame(title="データの保存 / 呼び出し", layout=save_config)],
             [
                 sg.Col(GetPose, size=(165, 140)),
                 sg.Col(SetPose, size=(165, 140)),
@@ -953,6 +996,13 @@ class Dobot_APP:
                 self.Window["-Calc_CNN-"].update(disabled=False)
 
         # ---------------------------------------------
+        # values を保存する
+        # ---------------------------------------------
+        if event == "-save_cfg-":
+            if values["-save_cfg_path-"]:
+                WriteDataToNdjson(values, values["-save_cfg_path-"])
+
+        # ---------------------------------------------
         # Dobotの接続を行う
         # ---------------------------------------------
         if event == "-Connect-":
@@ -979,17 +1029,18 @@ class Dobot_APP:
         if event == "-Alarm-":
             ClearAlAlarms(self.api)
             sg.popup("アラームを解消しました．")
-        # ----------------------- #
-        # グリッパを動作させる #
-        # ----------------------- #
+
+        # ---------------------------------------------
+        # グリッパを動作させる
+        # ---------------------------------------------
         elif event == "-Gripper-":
             if self.connection:
                 # グリッパを開く
                 GripperAutoCtrl(self.api)
 
-        # ------------------------------------------- #
-        # 現在の姿勢を取得し、画面上のに表示する #
-        # ------------------------------------------- #
+        # ---------------------------------------------
+        # 現在の姿勢を取得し、画面上のに表示する
+        # ---------------------------------------------
         elif event == "-GetPose-":
             if self.connection:
                 self.GetPose_UpdateWindow()
@@ -1005,9 +1056,9 @@ class Dobot_APP:
             response = self.SetJointPose_click(joint_pose)
             print(response)
 
-        # ----------------------------------------- #
-        # デカルト座標系で指定位置に動作させる #
-        # ----------------------------------------- #
+        # ---------------------------------------------
+        # デカルト座標系で指定位置に動作させる
+        # ---------------------------------------------
         elif event == "-SetCoordinatePose-":
             if self.connection:
                 if (
@@ -1061,10 +1112,10 @@ class Dobot_APP:
             if self.connection:
                 self.GetPose_UpdateWindow()
 
-                self.Window["-x0-"].update(str(self.CurrentPose["x"]))
-                self.Window["-y0-"].update(str(self.CurrentPose["y"]))
-                self.Window["-z0-"].update(str(self.CurrentPose["z"]))
-                self.Window["-r0-"].update(str(self.CurrentPose["r"]))
+                self.Window["-Retreat_x-"].update(str(self.CurrentPose["x"]))
+                self.Window["-Retreat_y-"].update(str(self.CurrentPose["y"]))
+                self.Window["-Retreat_z-"].update(str(self.CurrentPose["z"]))
+                self.Window["-Retreat_r-"].update(str(self.CurrentPose["r"]))
 
                 self.RecordPose = self.CurrentPose.copy()  # 現在の姿勢を記録
 
@@ -1077,8 +1128,8 @@ class Dobot_APP:
 
                 self.Alignment_1["x"] = self.CurrentPose["x"]
                 self.Alignment_1["y"] = self.CurrentPose["y"]
-                self.Window["-x1-"].update(str(self.Alignment_1["x"]))
-                self.Window["-y1-"].update(str(self.Alignment_1["y"]))
+                self.Window["-Alignment_x1-"].update(str(self.Alignment_1["x"]))
+                self.Window["-Alignment_y1-"].update(str(self.Alignment_1["y"]))
 
         # -------------------------------------------------------------- #
         #  画像とDobotの座標系の位置合わせ用変数_2をセットする   #
@@ -1089,8 +1140,8 @@ class Dobot_APP:
 
                 self.Alignment_2["x"] = self.CurrentPose["x"]
                 self.Alignment_2["y"] = self.CurrentPose["y"]
-                self.Window["-x2-"].update(str(self.Alignment_2["x"]))
-                self.Window["-y2-"].update(str(self.Alignment_2["y"]))
+                self.Window["-Alignment_x2-"].update(str(self.Alignment_2["x"]))
+                self.Window["-Alignment_y2-"].update(str(self.Alignment_2["y"]))
 
         # ------------------------------------ #
         # WebCamを選択&接続するイベント #
@@ -1206,6 +1257,9 @@ class Dobot_APP:
 
             self.ContoursBtn(dst_org, dst_bin, values)
 
+        # ---------------------------------------------
+        # タスクを実行するイベント
+        # ---------------------------------------------
         elif event == "-Task-":
             if values["-TaskNum-"] == "Task_1":
                 # -------------------------------------------------------------- #
@@ -1230,13 +1284,38 @@ class Dobot_APP:
 
                 # <<< キャリブレーション座標の存在判定 <<< #
                 if (
-                    (self.Alignment_1["x"] is None and self.Alignment_1["y"] is None)
-                    or (self.Alignment_2["x"] is None and self.Alignment_2["y"] is None)
-                    or (not self.InitPose)
-                    or (not self.RecordPose)
+                    (not values["-Alignment_x1-"] and not values["-Alignment_y1-"])
+                    or (not values["-Alignment_x2-"] and not values["-Alignment_y2-"])
+                    or (
+                        not values["-x_init-"]
+                        and not values["-y_init-"]
+                        and not values["-z_init-"]
+                        and not values["-r_init-"]
+                    )
+                    or (
+                        not values["-Retreat_x-"]
+                        and not values["-Retreat_y-"]
+                        and not values["-Retreat_z-"]
+                        and not values["-Retreat_r-"]
+                    )
                 ):
                     sg.popup("キャリブレーション座標 x1 および x2, \nもしくは 退避位置 がセットされていません。")
                     return
+
+                self.Alignment_1["x"] = float(values["-Alignment_x1-"])
+                self.Alignment_1["y"] = float(values["-Alignment_y1-"])
+                self.Alignment_2["x"] = float(values["-Alignment_x2-"])
+                self.Alignment_2["y"] = float(values["-Alignment_y2-"])
+
+                self.InitPose["x"] = float(values["-x_init-"])
+                self.InitPose["y"] = float(values["-y_init-"])
+                self.InitPose["z"] = float(values["-z_init-"])
+                self.InitPose["r"] = float(values["-r_init-"])
+
+                self.RecordPose["x"] = float(values["-Retreat_x-"])
+                self.RecordPose["y"] = float(values["-Retreat_y-"])
+                self.RecordPose["z"] = float(values["-Retreat_z-"])
+                self.RecordPose["r"] = float(values["-Retreat_r-"])
 
                 # タスク実行
                 self.Task1(cam, values)
@@ -1264,12 +1343,38 @@ class Dobot_APP:
 
                 # <<< キャリブレーション座標の存在判定 <<< #
                 if (
-                    (self.Alignment_1["x"] is None and self.Alignment_1["y"] is None)
-                    or (self.Alignment_2["x"] is None and self.Alignment_2["y"] is None)
-                    or (not self.RecordPose)
+                    (not values["-Alignment_x1-"] and not values["-Alignment_y1-"])
+                    or (not values["-Alignment_x2-"] and not values["-Alignment_y2-"])
+                    or (
+                        not values["-x_init-"]
+                        and not values["-y_init-"]
+                        and not values["-z_init-"]
+                        and not values["-r_init-"]
+                    )
+                    or (
+                        not values["-Retreat_x-"]
+                        and not values["-Retreat_y-"]
+                        and not values["-Retreat_z-"]
+                        and not values["-Retreat_r-"]
+                    )
                 ):
                     sg.popup("キャリブレーション座標 x1 および x2, \nもしくは 退避位置 がセットされていません。")
                     return
+
+                self.Alignment_1["x"] = float(values["-Alignment_x1-"])
+                self.Alignment_1["y"] = float(values["-Alignment_y1-"])
+                self.Alignment_2["x"] = float(values["-Alignment_x2-"])
+                self.Alignment_2["y"] = float(values["-Alignment_y2-"])
+
+                self.InitPose["x"] = float(values["-x_init-"])
+                self.InitPose["y"] = float(values["-y_init-"])
+                self.InitPose["z"] = float(values["-z_init-"])
+                self.InitPose["r"] = float(values["-r_init-"])
+
+                self.RecordPose["x"] = float(values["-Retreat_x-"])
+                self.RecordPose["y"] = float(values["-Retreat_y-"])
+                self.RecordPose["z"] = float(values["-Retreat_z-"])
+                self.RecordPose["r"] = float(values["-Retreat_r-"])
 
                 # タスク実行
                 self.Task2(cam, values)
@@ -1320,9 +1425,29 @@ class Dobot_APP:
                     return
 
                 # オブジェクトの退避先が設定されていない場合
-                if not self.RecordPose:
-                    sg.popup("オブジェクトの退避位置が設定されていません。", title=_Dobot_err[6])
+                if (
+                    not values["-x_init-"]
+                    and not values["-y_init-"]
+                    and not values["-z_init-"]
+                    and not values["-r_init-"]
+                ) or (
+                    not values["-Retreat_x-"]
+                    and not values["-Retreat_y-"]
+                    and not values["-Retreat_z-"]
+                    and not values["-Retreat_r-"]
+                ):
+                    sg.popup("オブジェクトの初期位置もしくは退避位置が設定されていません。", title=_Dobot_err[6])
                     return
+
+                self.InitPose["x"] = float(values["-x_init-"])
+                self.InitPose["y"] = float(values["-y_init-"])
+                self.InitPose["z"] = float(values["-z_init-"])
+                self.InitPose["r"] = float(values["-r_init-"])
+
+                self.RecordPose["x"] = float(values["-Retreat_x-"])
+                self.RecordPose["y"] = float(values["-Retreat_y-"])
+                self.RecordPose["z"] = float(values["-Retreat_z-"])
+                self.RecordPose["r"] = float(values["-Retreat_r-"])
 
                 # タスク実行
                 self.Task4(cam, values)
@@ -1347,13 +1472,40 @@ class Dobot_APP:
 
                 # <<< キャリブレーション座標の存在判定 <<< #
                 if (
-                    (self.Alignment_1["x"] is None and self.Alignment_1["y"] is None)
-                    or (self.Alignment_2["x"] is None and self.Alignment_2["y"] is None)
-                    or (not self.RecordPose)
+                    (not values["-Alignment_x1-"] and not values["-Alignment_y1-"])
+                    or (not values["-Alignment_x2-"] and not values["-Alignment_y2-"])
+                    or (
+                        not values["-x_init-"]
+                        and not values["-y_init-"]
+                        and not values["-z_init-"]
+                        and not values["-r_init-"]
+                    )
+                    or (
+                        not values["-Retreat_x-"]
+                        and not values["-Retreat_y-"]
+                        and not values["-Retreat_z-"]
+                        and not values["-Retreat_r-"]
+                    )
                 ):
                     sg.popup("キャリブレーション座標 x1 および x2, \nもしくは 退避位置 がセットされていません。")
                     return
 
+                self.Alignment_1["x"] = float(values["-Alignment_x1-"])
+                self.Alignment_1["y"] = float(values["-Alignment_y1-"])
+                self.Alignment_2["x"] = float(values["-Alignment_x2-"])
+                self.Alignment_2["y"] = float(values["-Alignment_y2-"])
+
+                self.InitPose["x"] = float(values["-x_init-"])
+                self.InitPose["y"] = float(values["-y_init-"])
+                self.InitPose["z"] = float(values["-z_init-"])
+                self.InitPose["r"] = float(values["-r_init-"])
+
+                self.RecordPose["x"] = float(values["-Retreat_x-"])
+                self.RecordPose["y"] = float(values["-Retreat_y-"])
+                self.RecordPose["z"] = float(values["-Retreat_z-"])
+                self.RecordPose["r"] = float(values["-Retreat_r-"])
+
+                # タスク実行
                 self.Task5(main_cam=main_cam, sub_cam=sub_cam, values=values)
 
     def main(self):
@@ -1749,7 +1901,7 @@ class Dobot_APP:
             if err == 7:
                 return
             # 最終的に戻ってくる初期位置を保持
-            init_pose = self.GetPose_UpdateWindow()  # pose -> self.CurrentPose
+            init_pose = self.InitPose
             # 現在のDobotの姿勢を取得
             pose = self.GetPose_UpdateWindow()  # pose -> self.CurrentPose
             # ------------------------------ #
@@ -1777,7 +1929,7 @@ class Dobot_APP:
             # グリッパーを開く。
             GripperAutoCtrl(self.api)
             # DobotをZ=-35の位置まで降下させる。
-            pose["z"] = self.RecordPose["z"]
+            pose["z"] = self.RecordPose["z"].copy()
             SetPoseAct(self.api, pose=pose, ptpMoveMode=values["-MoveMode-"])
             # グリッパを閉じる。
             GripperAutoCtrl(self.api)
@@ -1795,7 +1947,7 @@ class Dobot_APP:
                 ptpMoveMode=values["-MoveMode-"],
             )
             # DobotをZ=-35の位置まで降下させる。
-            pose["z"] = self.RecordPose["z"]
+            pose["z"] = self.RecordPose["z"].copy()
             SetPoseAct(self.api, pose=pose, ptpMoveMode=values["-MoveMode-"])
             # グリッパを開く．
             GripperAutoCtrl(self.api)
@@ -1829,7 +1981,7 @@ class Dobot_APP:
             if err == 7:
                 return
             # 最終的に戻ってくる初期位置を保持
-            init_pose = self.GetPose_UpdateWindow()  # pose -> self.CurrentPose
+            init_pose = self.InitPose
             # 現在のDobotの姿勢を取得
             pose = self.GetPose_UpdateWindow()  # pose -> self.CurrentPose
             # ------------------------------ #
@@ -1838,7 +1990,7 @@ class Dobot_APP:
             if len(dst_bin.shape) == 2:
                 h, w = dst_bin.shape
             elif len(dst_bin.shape) == 3:
-                h, w, c = dst_bin.shape
+                h, w, _ = dst_bin.shape
             try:
                 pose["x"] = (
                     self.Alignment_1["x"]
@@ -1861,7 +2013,7 @@ class Dobot_APP:
             # グリッパーを開く。
             GripperAutoCtrl(self.api)
             # DobotをZ=-35の位置まで降下させる。
-            pose["z"] = self.RecordPose["z"]
+            pose["z"] = self.RecordPose["z"].copy()
             SetPoseAct(self.api, pose=pose, ptpMoveMode=values["-MoveMode-"])
             # グリッパを閉じる。
             GripperAutoCtrl(self.api)
@@ -1879,7 +2031,7 @@ class Dobot_APP:
                 ptpMoveMode=values["-MoveMode-"],
             )
             # DobotをZ=-35の位置まで降下させる。
-            pose["z"] = self.RecordPose["z"]
+            pose["z"] = self.RecordPose["z"].copy()
             SetPoseAct(self.api, pose=pose, ptpMoveMode=values["-MoveMode-"])
             # グリッパを開く．
             GripperAutoCtrl(self.api)
@@ -1959,7 +2111,7 @@ class Dobot_APP:
                 and data["COG"] is not None
             ):
                 # 最終的に戻ってくる初期位置を保持
-                init_pose = self.GetPose_UpdateWindow()  # pose -> self.CurrentPose
+                init_pose = self.InitPose
                 # 現在のDobotの姿勢を取得
                 pose = self.GetPose_UpdateWindow()  # pose -> self.CurrentPose
                 self.Window["-CenterOfGravity_x-"].update(str(data["COG"][0]))
@@ -1982,7 +2134,7 @@ class Dobot_APP:
             # グリッパーを開く。
             GripperAutoCtrl(self.api)
             # DobotをZ=-35の位置まで降下させる。
-            pose["z"] = self.RecordPose["z"]
+            pose["z"] = self.RecordPose["z"].copy()
             SetPoseAct(self.api, pose=pose, ptpMoveMode=values["-MoveMode-"])
             # グリッパを閉じる。
             GripperAutoCtrl(self.api)
@@ -2000,7 +2152,7 @@ class Dobot_APP:
                 ptpMoveMode=values["-MoveMode-"],
             )
             # DobotをZ=-35の位置まで降下させる。
-            pose["z"] = self.RecordPose["z"]
+            pose["z"] = self.RecordPose["z"].copy()
             SetPoseAct(self.api, pose=pose, ptpMoveMode=values["-MoveMode-"])
             # グリッパを開く．
             GripperAutoCtrl(self.api)
@@ -2105,7 +2257,7 @@ class Dobot_APP:
             # グリッパーを開く。
             GripperAutoCtrl(self.api)
             # DobotをZ=-35の位置まで降下させる。
-            pose["z"] = self.RecordPose["z"]
+            pose["z"] = self.RecordPose["z"].copy()
             SetPoseAct(self.api, pose=pose, ptpMoveMode=values["-MoveMode-"])
             # グリッパを閉じる。
             GripperAutoCtrl(self.api)
@@ -2123,7 +2275,7 @@ class Dobot_APP:
                 ptpMoveMode=values["-MoveMode-"],
             )
             # DobotをZ=-35の位置まで降下させる。
-            pose["z"] = self.RecordPose["z"]
+            pose["z"] = self.RecordPose["z"].copy()
             SetPoseAct(self.api, pose=pose, ptpMoveMode=values["-MoveMode-"])
             # グリッパを開く．
             GripperAutoCtrl(self.api)

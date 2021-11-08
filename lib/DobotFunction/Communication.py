@@ -428,6 +428,16 @@ def _wirte(f, data):
     return error  # エラーが無ければNoneを返す
 
 
+def ClearAlAlarms(api):
+    """
+    Dobot のアラームを解消する関数．
+
+    Args:
+        api(dType): DobotAPIのコンストラクタ
+    """
+    dType.ClearAllAlarmsState(api)
+
+
 if __name__ == "__main__":
     from DobotDLL import DobotDllType as dType
     from lib.config.config import cfg

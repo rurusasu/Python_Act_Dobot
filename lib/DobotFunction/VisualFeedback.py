@@ -185,6 +185,10 @@ class VisualFeedback(object):
         K_p = float(values["-Kp-"])
         K_i = float(values["-Ki-"])
 
+        dst_org = dst_bin = None
+        COG = []
+        e_x = e_y = 0
+
         return_param = {"pose": None, "COG": []}
         try:
             while True:

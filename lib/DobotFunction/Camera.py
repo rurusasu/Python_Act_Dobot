@@ -172,8 +172,9 @@ def Preview(img: np.ndarray = None, window_name: str = "frame", preview: str = "
 
 
 def Color_cvt(src: np.ndarray, color_type: str):
-    """画像の色空間を変換する関数
-    変換には OpenCV の関数を使用する。
+    """
+    画像の色空間を変換する関数。変換には OpenCV の関数を使用する。
+    入力された画像は、コピーされず直接変換される点に注意。
 
     Args:
         src (np.ndarray): 変換前の画像
@@ -184,17 +185,16 @@ def Color_cvt(src: np.ndarray, color_type: str):
     Return:
         det (np.ndarray): 変換後の画像
     """
-    dst = src.copy()
     try:
         if color_type == "Gray":
             # dst = cv2.cvtColor(dst, cv2.COLOR_RGB2GRAY)
-            dst = AutoGrayScale(dst, clearly=True)
+            dst = AutoGrayScale(src, clearly=True)
         elif color_type == "HSV":
-            dst = cv2.cvtColor(dst, cv2.COLOR_RGB2HSV)
+            dst = cv2.cvtColor(src, cv2.COLOR_RGB2HSV)
         else:
             raise ValueError("選択された変換は存在しません。")
     except Exception as e:
-        print(e)
+        print(f"Color convert error: {e}")
     else:
         return dst
 
@@ -251,7 +251,7 @@ def ImageCvt(
 def SnapshotCvt(
     cam: cv2.VideoCapture,
     Color_Space: Literal["RGB", "Gray"] = "RGB",
-    Color_Density: Literal["なし", "線形濃度変換", "ヒストグラム平坦化"] = "なし",
+    Color_Density: Literal["なし", "線形濃度変換", "非線形濃度変換", "ヒストグラム平坦化"] = "なし",
     Binarization: Literal["なし", "Global", "Otsu", "Adaptive", "Two"] = "なし",
     LowerThreshold: int = 10,
     UpperThreshold: int = 150,
@@ -260,10 +260,33 @@ def SnapshotCvt(
     AdaptiveThreshold_Constant: int = 2,
     color: int = 4,
 ) -> Tuple[int, np.ndarray, np.ndarray]:
-    dst_org = dst_bin = None
-    response, dst_org = Snapshot(cam)
+    """
+    スナップショットを撮影し，二値化処理を行う関数．
 
-    if response != 3:
+    Args:
+        cam (cv2.VideoCapture): 接続しているカメラ情報
+        Color_Space (Literal[, optional): 画像の階調．["RGB", "Gray"]． Defaults to "RGB".
+        Color_Density (Literal[, optional): 画像の濃度変換.
+        * ["線形濃度変換", "非線形濃度変換", "ヒストグラム平坦化"]．
+        * Defaults to "なし".
+        Binarization (Literal[, optional): 画像の二値化. Defaults to "なし".
+        LowerThreshold (int, optional): [description]. Defaults to 10.
+        UpperThreshold (int, optional): [description]. Defaults to 150.
+        AdaptiveThreshold_type (Literal[, optional): [description]. Defaults to "Mean".
+        AdaptiveThreshold_BlockSize (int, optional): [description]. Defaults to 11.
+        AdaptiveThreshold_Constant (int, optional): [description]. Defaults to 2.
+        color (int, optional): [description]. Defaults to 4.
+
+    Returns:
+        Tuple[int, np.ndarray, np.ndarray]: 返り値
+        * err (int): エラーフラグ．4: 撮影エラー, 5: 画像処理成功
+        * dst_org (np.ndarray): 撮影されたオリジナル画像
+        * dst_bin (np.ndarray): 画像処理された画像
+    """
+    dst_org = dst_bin = None
+    err, dst_org = Snapshot(cam)
+
+    if err != 3:
         return 4, []  # WebCam_NotGetImage
 
     err, _, dst_bin = ImageCvt(

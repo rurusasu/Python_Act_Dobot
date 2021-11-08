@@ -38,7 +38,7 @@ def GlobalThreshold(
     """
     if type(img) is not np.ndarray:  # 入力データがndarray型でない場合
         raise ValueError("入力型が異なります。")
-    elif len(img.shape) != 2: # 入力データがグレースケール画像でない場合
+    elif len(img.shape) != 2:  # 入力データがグレースケール画像でない場合
         raise ValueError("入力はグレースケール画像でなければなりません。")
 
     try:
@@ -56,11 +56,7 @@ def GlobalThreshold(
         return dst
 
 
-def _OtsuThreshold(
-    img: np.ndarray,
-    min_value: int = 0,
-    max_value: int = 255
-):
+def _OtsuThreshold(img: np.ndarray, min_value: int = 0, max_value: int = 255):
     """
     入力画像が bimodal image (ヒストグラムが双峰性を持つような画像)であることを仮定すると、
     そのような画像に対して、二つのピークの間の値を閾値として選べば良いと考えることであろう。これが大津の二値化の手法である。
@@ -117,10 +113,8 @@ def _OtsuThreshold(
 
 
 def AdaptiveThreshold(
-    img: np.ndarray,
-    method: str="Mean",
-    block_size: int=11,
-    C: int=2):
+    img: np.ndarray, method: str = "Mean", block_size: int = 11, C: int = 2
+):
     """
     適応的閾値処理では，画像の小領域ごとに閾値の値を計算する．
     そのため領域によって光源環境が変わるような画像に対しては，単純な閾値処理より良い結果が得られる．
@@ -139,43 +133,39 @@ def AdaptiveThreshold(
     Return:
         dst (np.ndarray): 変換後の画像
     """
-    dst = None
     if type(img) is not np.ndarray:  # 入力データがndarray型でない場合
         raise ValueError("入力型が異なります。")
-    elif len(img.shape) != 2: # 入力データがグレースケール画像でない場合
+    elif len(img.shape) != 2:  # 入力データがグレースケール画像でない場合
         raise ValueError("入力はグレースケール画像でなければなりません。")
 
     if method == "Mean":
         method = cv2.ADAPTIVE_THRESH_MEAN_C
         dst = cv2.adaptiveThreshold(
-        src=img,
-        maxValue=255,
-        adaptiveMethod=method,
-        thresholdType=cv2.THRESH_BINARY,
-        blockSize=block_size,
-        C=C
+            src=img,
+            maxValue=255,
+            adaptiveMethod=method,
+            thresholdType=cv2.THRESH_BINARY,
+            blockSize=block_size,
+            C=C,
         )
     elif method == "Gaussian":
         method = cv2.ADAPTIVE_THRESH_GAUSSIAN_C
         dst = cv2.adaptiveThreshold(
-        src=img,
-        maxValue=255,
-        adaptiveMethod=method,
-        thresholdType=cv2.THRESH_BINARY,
-        blockSize=block_size,
-        C=C
+            src=img,
+            maxValue=255,
+            adaptiveMethod=method,
+            thresholdType=cv2.THRESH_BINARY,
+            blockSize=block_size,
+            C=C,
         )
     elif method == "Wellner":
         dst = _WellnerMethod(img)
-    #elif method == "Bradley":
+    # elif method == "Bradley":
 
     return dst
 
 
-def _WellnerMethod(
-    gray_img: np.ndarray,
-    t: int=15
-):
+def _WellnerMethod(gray_img: np.ndarray, t: int = 15):
     """Wellner の適応的二値化処理を行う関数
 
     Args:
@@ -195,14 +185,16 @@ def _WellnerMethod(
     gray_array = gray_img.reshape((-1, 1))
     try:
         # もし画像の幅が8で割り切れない場合
-        if width % 8 != 0: raise ValueError("画像の幅が不正です！") # 例外を発生させる
-        else: s = int(width / 8)
+        if width % 8 != 0:
+            raise ValueError("画像の幅が不正です！")  # 例外を発生させる
+        else:
+            s = int(width / 8)
     except Exception as e:
         print(e)
         return None
 
     dst = np.empty(0)
-    #移動平均(Moving average)を計算するためのlistを作成
+    # 移動平均(Moving average)を計算するためのlistを作成
     MA_list = np.zeros((s))
 
     for i, v in enumerate(gray_array):
@@ -210,28 +202,28 @@ def _WellnerMethod(
         MA = MA_list.sum() / s
         MA_list_2 = MA_list[:-1].copy()
         MA_list = np.insert(MA_list_2, 0, v)
-        #---------------------
+        # ---------------------
         # 二値化処理する
-        #---------------------
-        if v < MA * ((100-t) / 100):
+        # ---------------------
+        if v < MA * ((100 - t) / 100):
             v = 255
         else:
             v = 0
 
         v = np.array(v)
         dst = np.r_[dst, v]
-    print('処理が終了しました。')
+    print("処理が終了しました。")
     dst = dst.reshape((height, width)).astype(np.uint8)
     return dst
 
 
-
 def TwoThreshold(
     img: np.ndarray,
-    LowerThreshold: int=0,
-    UpperThreshold: int=128,
-    PickupColor: int=4,
-    Type: Literal["cv2", "Otsu"] = "cv2"):
+    LowerThreshold: int = 0,
+    UpperThreshold: int = 128,
+    PickupColor: int = 4,
+    Type: Literal["cv2", "Otsu"] = "cv2",
+):
     """
     上側と下側の2つの閾値で2値化を行う。
     二値化には大局的閾値処理を用いる。
@@ -259,7 +251,7 @@ def TwoThreshold(
 
     if type(img) is not np.ndarray:  # 入力データがndarray型でない場合
         raise ValueError("入力型が異なります。")
-    elif len(img.shape) != 3: # 入力データがグレースケール画像でない場合
+    elif len(img.shape) != 3:  # 入力データがグレースケール画像でない場合
         raise ValueError("入力はRGB画像でなければなりません。")
 
     r, g, b = cv2.split(img)
@@ -277,23 +269,21 @@ def TwoThreshold(
     IMAGE_B__ = GlobalThreshold(b, LowerThreshold, Type)
     IMAGE_B__ = cv2.bitwise_not(IMAGE_B__)
 
+    IMAGE_bw = None
     if PickupColor == 0:
-        IMAGE_bw = IMAGE_R_bw*IMAGE_G__*IMAGE_B__   # 画素毎の積を計算 ⇒ 赤色部分の抽出
+        IMAGE_bw = IMAGE_R_bw * IMAGE_G__ * IMAGE_B__  # 画素毎の積を計算 ⇒ 赤色部分の抽出
     elif PickupColor == 1:
-        IMAGE_bw = IMAGE_G_bw*IMAGE_B__*IMAGE_R__   # 画素毎の積を計算 ⇒ 緑色部分の抽出
+        IMAGE_bw = IMAGE_G_bw * IMAGE_B__ * IMAGE_R__  # 画素毎の積を計算 ⇒ 緑色部分の抽出
     elif PickupColor == 2:
-        IMAGE_bw = IMAGE_B_bw*IMAGE_R__*IMAGE_G__   # 画素毎の積を計算 ⇒ 青色部分の抽出
+        IMAGE_bw = IMAGE_B_bw * IMAGE_R__ * IMAGE_G__  # 画素毎の積を計算 ⇒ 青色部分の抽出
     elif PickupColor == 3:
-        IMAGE_bw = IMAGE_R_bw*IMAGE_G_bw*IMAGE_B_bw  # 画素毎の積を計算 ⇒ 白色部分の抽出
+        IMAGE_bw = IMAGE_R_bw * IMAGE_G_bw * IMAGE_B_bw  # 画素毎の積を計算 ⇒ 白色部分の抽出
     elif PickupColor == 4:
-        IMAGE_bw = IMAGE_R__*IMAGE_G__*IMAGE_B__    # 画素毎の積を計算 ⇒ 黒色部分の抽出
+        IMAGE_bw = IMAGE_R__ * IMAGE_G__ * IMAGE_B__  # 画素毎の積を計算 ⇒ 黒色部分の抽出
     else:
         raise ValueError("選択されたカラーはピックアップできません。")
-        return None
 
     return IMAGE_bw
-
-
 
 
 if __name__ == "__main__":
@@ -305,8 +295,8 @@ if __name__ == "__main__":
     from src.config.config import cfg
 
     # テスト画像の保存先
-    #save_path = cfg.BINARY_IMG_DIR + os.sep + "gray_to_wellner"
-    #save_path = cfg.BINARY_IMG_DIR + os.sep + "rgb_to_wellner"
+    # save_path = cfg.BINARY_IMG_DIR + os.sep + "gray_to_wellner"
+    # save_path = cfg.BINARY_IMG_DIR + os.sep + "rgb_to_wellner"
     save_path = cfg.BINARY_IMG_DIR + os.sep + "gray_to_mean"
     method = "mean"
 
@@ -319,9 +309,9 @@ if __name__ == "__main__":
     for data in datas["org_img"]:
         for key, value in data.items():
             if key == "path":
-                img = np.array(Image.open(value)) # 画像を開いて numpy 配列に変換
-                img = AutoGrayScale(img) # グレースケール化
-                dst = AdaptiveThreshold(img) # 適応的二値化処理
+                img = np.array(Image.open(value))  # 画像を開いて numpy 配列に変換
+                img = AutoGrayScale(img)  # グレースケール化
+                dst = AdaptiveThreshold(img)  # 適応的二値化処理
                 if type(dst) == np.ndarray:
                     dst = Image.fromarray(dst)
                 dst.save(save_path + os.sep + name + ".png")
@@ -434,4 +424,3 @@ if __name__ == "__main__":
     # dst = AdaptiveThreshold(img, method="Wellner") # 適応的二値化処理
     # plt.imshow(dst, cmap="gray")
     # plt.show()
-
