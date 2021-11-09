@@ -1,3 +1,4 @@
+from json import dumps
 import sys, os
 from typing import Dict, List, Tuple, Union
 
@@ -32,7 +33,7 @@ from lib.DobotFunction.Communication import (
 )
 from lib.DobotFunction.VisualFeedback import VisualFeedback
 from lib.config.config import cfg
-from lib.utils.base_utils import WriteDataToNdjson
+from lib.utils.base_utils import ReadNdjsonToDict, WriteDataToNdjson
 
 # from ..DobotDLL
 
@@ -194,11 +195,10 @@ class Dobot_APP:
             [
                 # sg.Input(size=(30, 1), disabled=True),
                 sg.FileBrowse(
-                    button_text="Loadfile path of Config",
-                    change_submits=True,
+                    button_text="Load file of Config",
+                    file_types=(("JSON", "*.json"),),
                     enable_events=True,
-                    disabled=False,
-                    key="-load_cfg_path-",
+                    key="-load_cfg-",
                 ),
             ],
         ]
@@ -997,8 +997,29 @@ class Dobot_APP:
         # values を保存する
         # ---------------------------------------------
         if event == "-save_cfg-":
-            WriteDataToNdjson(values, values["-save_cfg-"])
-            sg.Popup("画面の情報を JSON ファイルに保存しました。", title="File saved")
+            if values["-save_cfg-"] != "":
+                # もし、すでにファイルが存在する場合
+                if os.path.exists(values["-save_cfg-"]):
+                    # ファイルを一度削除
+                    os.remove(values["-save_cfg-"])
+
+                json_pth = values["-save_cfg-"]
+                # 不要なパラメタを削除する
+                del (
+                    values[0],
+                    values["-load_cfg-"],
+                    values["-save_cfg-"],
+                    values["-IMAGE_path-"],
+                )
+                WriteDataToNdjson(values, json_pth)
+                sg.Popup("画面の情報を JSON ファイルに保存しました。", title="File saved")
+
+        if event == "-load_cfg-":
+            if values["-load_cfg-"] != "":
+                data = ReadNdjsonToDict(values["-load_cfg-"])
+                for key, value in data.items():
+                    values[key] = value
+                    self.Window[key].update(value)
 
         # ---------------------------------------------
         # Dobotの接続を行う
