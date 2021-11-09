@@ -19,6 +19,7 @@ from lib.DobotDLL import DobotDllType as dType
 from lib.DobotFunction.Camera import (
     DeviceNameToNum,
     ImageCvt,
+    VideoCaptureWrapper,
     WebCam_OnOff,
     scale_box,
     SnapshotCvt,
@@ -59,6 +60,7 @@ _WebCam_err = {
     6: "ImageFile_NotFound",
     7: "Image_ChannelError",
     8: "COG_CalculationCompleted",
+    9: "COG_CalculationError",
 }
 
 _CamList = {
@@ -1221,7 +1223,7 @@ class Dobot_APP:
                     cam = _CamList["1"]["cam_object"]
 
                 # どのラジオボタンもアクティブでない場合 -> カメラが1つも接続されていない場合．
-                if type(cam) == cv2.VideoCapture:
+                if cam != None:
                     self.IMAGE_Org, self.IMAGE_bin = self.SnapshotBtn(cam, values)
                 else:
                     sg.popup(_WebCam_err[2], title="カメラ接続エラー")
@@ -1654,26 +1656,33 @@ class Dobot_APP:
         # カメラを接続するイベント #
         # --------------------------- #
         # カメラを初めて接続する場合 -> カメラを新規接続
-        # 接続したいカメラが接続していカメラと同じ場合 -> カメラを解放
-        if (_CamList[str(dict_num)]["cam_num"] is None) or (
-            _CamList[str(dict_num)]["cam_num"] == cam_num
-        ):
-            response, cam_obj = WebCam_OnOff(
+        if _CamList[str(dict_num)]["cam_num"] is None:
+            cam_obj = VideoCaptureWrapper(
                 cam_num, cam=_CamList[str(dict_num)]["cam_object"]
             )
+            response = cam_obj.isError()
 
+        # 接続したいカメラが接続していカメラと同じ場合 -> カメラを解放
+        elif _CamList[str(dict_num)]["cam_num"] == cam_num:
+            # response, cam_obj = WebCam_OnOff(
+            #    cam_num, cam=_CamList[str(dict_num)]["cam_object"]
+            # )
+            response, cam_obj = _CamList[str(dict_num)]["cam_object"].release()
         # 接続したいカメラと接続しているカメラが違う場合 -> 接続しているカメラを解放し、新規接続
         elif _CamList[str(dict_num)]["cam_num"] is not None:
             # まず接続しているカメラを開放する．
-            response, cam_obj = WebCam_OnOff(
-                device_num=_CamList[str(dict_num)]["cam_num"],
-                cam=_CamList[str(dict_num)]["cam_object"],
-            )
+            # response, cam_obj = WebCam_OnOff(
+            #     device_num=_CamList[str(dict_num)]["cam_num"],
+            #     cam=_CamList[str(dict_num)]["cam_object"],
+            # )
+            response, cam_obj = _CamList[str(dict_num)]["cam_object"].release()
             # 開放できた場合
             if response == 1:
                 sg.popup(_WebCam_err[response], title="Camの接続")
                 # 次に新しいカメラを接続する．
-                response, cam_obj = WebCam_OnOff(cam_num, cam=cam_obj)
+                # response, cam_obj = WebCam_OnOff(cam_num, cam=cam_obj)
+                cam_obj = VideoCaptureWrapper(cam_num, cam=cam_obj)
+                response = cam_obj.isError()
 
         if response == 0:  # Connect！
             _CamList[str(dict_num)]["cam_num"] = cam_num
@@ -1912,75 +1921,78 @@ class Dobot_APP:
             cam(cv2.VideoCapture): 接続しているカメラ情報
             values (list): ウインドウ上のボタンの状態などを記録している変数
         """
-        if self.connection and (type(cam) == cv2.VideoCapture):
-            dst_org, dst_bin = self.SnapshotBtn(cam, values, drawing=False)
-            # 画像を撮影 & 重心位置を計算
-            err, COG = self.ContoursBtn(dst_org, dst_bin, values, drawing=False)
-
-            if err == 7:
-                return
-            # 最終的に戻ってくる初期位置を保持
-            init_pose = self.InitPose
-            # 現在のDobotの姿勢を取得
-            pose = self.GetPose_UpdateWindow()  # pose -> self.CurrentPose
-            # ------------------------------ #
-            # Dobotの移動後の姿勢を計算 #
-            # ------------------------------ #
-            if len(dst_bin.shape) == 2:
-                h, w = dst_bin.shape
-            elif len(dst_bin.shape) == 3:
-                h, w, c = dst_bin.shape
-            try:
-                pose["x"] = (
-                    self.Alignment_1["x"]
-                    + COG[1] * (self.Alignment_2["x"] - self.Alignment_1["x"]) / h
-                )
-                pose["y"] = (
-                    self.Alignment_1["y"]
-                    + COG[0] * (self.Alignment_2["y"] - self.Alignment_1["y"]) / w
-                )
-            except ZeroDivisionError:  # ゼロ割が発生した場合
-                sg.popup("画像のサイズが計測されていません", title="エラー")
-                return
-
-            # Dobotをオブジェクト重心の真上まで移動させる。
-            SetPoseAct(self.api, pose=pose, ptpMoveMode=values["-MoveMode-"])
-            # グリッパーを開く。
-            GripperAutoCtrl(self.api)
-            # DobotをZ=-35の位置まで降下させる。
-            pose["z"] = self.RecordPose["z"].copy()
-            SetPoseAct(self.api, pose=pose, ptpMoveMode=values["-MoveMode-"])
-            # グリッパを閉じる。
-            GripperAutoCtrl(self.api)
-            # DobotをZ=20の位置まで上昇させる。
-            # pose["z"] = self.CurrentPose["z"]
-            pose["z"] = 20
-            SetPoseAct(self.api, pose=pose, ptpMoveMode=values["-MoveMode-"])
-            # 退避位置まで移動させる。
-            pose = self.RecordPose.copy()
-            # DobotをZ=20の位置まで上昇させる。
-            pose["z"] = 20
-            SetPoseAct(
-                self.api,
-                pose=pose,
-                ptpMoveMode=values["-MoveMode-"],
-            )
-            # DobotをZ=-35の位置まで降下させる。
-            pose["z"] = self.RecordPose["z"].copy()
-            SetPoseAct(self.api, pose=pose, ptpMoveMode=values["-MoveMode-"])
-            # グリッパを開く．
-            GripperAutoCtrl(self.api)
-            # DobotをZ=20の位置まで上昇させる。
-            pose["z"] = 20
-            SetPoseAct(self.api, pose=pose, ptpMoveMode=values["-MoveMode-"])
-            # グリッパを閉じる．
-            GripperAutoCtrl(self.api)
-            # グリッパを初期位置まで移動させる．
-            SetPoseAct(self.api, pose=init_pose, ptpMoveMode=values["-MoveMode-"])
-
-        else:
-            sg.popup("Dobotかカメラが接続されていません。")
+        if not self.connection:
+            sg.popup("Dobotが接続されていません。", title=_Dobot_err[1])
             return
+        if cam is None:
+            sg.popup("カメラが接続されていません。", _WebCam_err[2])
+            return
+
+        dst_org, dst_bin = self.SnapshotBtn(cam, values, drawing=False)
+        # 画像を撮影 & 重心位置を計算
+        err, COG = self.ContoursBtn(dst_org, dst_bin, values, drawing=False)
+        if err == 7:
+            sg.popup("画像のチャネル数が不正です。", titile=_WebCam_err[err])
+            return
+
+        # 最終的に戻ってくる初期位置を保持
+        init_pose = self.InitPose
+        # 現在のDobotの姿勢を取得
+        pose = self.GetPose_UpdateWindow()  # pose -> self.CurrentPose
+        # ------------------------------ #
+        # Dobotの移動後の姿勢を計算 #
+        # ------------------------------ #
+        if len(dst_bin.shape) == 2:
+            h, w = dst_bin.shape
+        elif len(dst_bin.shape) == 3:
+            h, w, c = dst_bin.shape
+        try:
+            pose["x"] = (
+                self.Alignment_1["x"]
+                + COG[1] * (self.Alignment_2["x"] - self.Alignment_1["x"]) / h
+            )
+            pose["y"] = (
+                self.Alignment_1["y"]
+                + COG[0] * (self.Alignment_2["y"] - self.Alignment_1["y"]) / w
+            )
+        except ZeroDivisionError:  # ゼロ割が発生した場合
+            sg.popup("画像のサイズが計測されていません", title="エラー")
+            return
+
+        # Dobotをオブジェクト重心の真上まで移動させる。
+        SetPoseAct(self.api, pose=pose, ptpMoveMode=values["-MoveMode-"])
+        # グリッパーを開く。
+        GripperAutoCtrl(self.api)
+        # DobotをZ=-35の位置まで降下させる。
+        pose["z"] = self.RecordPose["z"]
+        SetPoseAct(self.api, pose=pose, ptpMoveMode=values["-MoveMode-"])
+        # グリッパを閉じる。
+        GripperAutoCtrl(self.api)
+        # DobotをZ=20の位置まで上昇させる。
+        # pose["z"] = self.CurrentPose["z"]
+        pose["z"] = 20
+        SetPoseAct(self.api, pose=pose, ptpMoveMode=values["-MoveMode-"])
+        # 退避位置まで移動させる。
+        pose = self.RecordPose.copy()
+        # DobotをZ=20の位置まで上昇させる。
+        pose["z"] = 20
+        SetPoseAct(
+            self.api,
+            pose=pose,
+            ptpMoveMode=values["-MoveMode-"],
+        )
+        # DobotをZ=-35の位置まで降下させる。
+        pose["z"] = self.RecordPose["z"]
+        SetPoseAct(self.api, pose=pose, ptpMoveMode=values["-MoveMode-"])
+        # グリッパを開く．
+        GripperAutoCtrl(self.api)
+        # DobotをZ=20の位置まで上昇させる。
+        pose["z"] = 20
+        SetPoseAct(self.api, pose=pose, ptpMoveMode=values["-MoveMode-"])
+        # グリッパを閉じる．
+        GripperAutoCtrl(self.api)
+        # グリッパを初期位置まで移動させる．
+        SetPoseAct(self.api, pose=init_pose, ptpMoveMode=values["-MoveMode-"])
 
     def Task2(self, cam: cv2.VideoCapture, values: list):
         """
@@ -1992,79 +2004,84 @@ class Dobot_APP:
             cam(cv2.VideoCapture): 接続しているカメラ情報
             values (list): ウインドウ上のボタンの状態などを記録している変数
         """
-        if self.connection and (type(cam) == cv2.VideoCapture):
-            dst_org, dst_bin = self.SnapshotBtn(cam, values, drawing=False)
-            # 画像を撮影 & 重心位置を計算
-            err, COG = self.ContoursBtn(dst_org, dst_bin, values, drawing=False)
-
-            if err == 7:
-                return
-            # 最終的に戻ってくる初期位置を保持
-            init_pose = self.InitPose
-            # 現在のDobotの姿勢を取得
-            pose = self.GetPose_UpdateWindow()  # pose -> self.CurrentPose
-            # ------------------------------ #
-            # Dobotの移動後の姿勢を計算 #
-            # ------------------------------ #
-            if len(dst_bin.shape) == 2:
-                h, w = dst_bin.shape
-            elif len(dst_bin.shape) == 3:
-                h, w, _ = dst_bin.shape
-            try:
-                pose["x"] = (
-                    self.Alignment_1["x"]
-                    + COG[1] * (self.Alignment_2["x"] - self.Alignment_1["x"]) / h
-                )
-                pose["y"] = (
-                    self.Alignment_1["y"]
-                    + COG[0] * (self.Alignment_2["y"] - self.Alignment_1["y"]) / w
-                )
-            except ZeroDivisionError:  # ゼロ割が発生した場合
-                sg.popup("画像のサイズが計測されていません", title="エラー")
-                return
-
-            # Dobotをオブジェクト重心の真上まで移動させる。
-            SetPoseAct(self.api, pose=pose, ptpMoveMode=values["-MoveMode-"])
-            # エンドエフェクタを推定した角度に回転する．
-            if COG[2] is not None:
-                pose["r"] = COG[2] - 90
-                SetPoseAct(self.api, pose=pose, ptpMoveMode=values["-MoveMode-"])
-            # グリッパーを開く。
-            GripperAutoCtrl(self.api)
-            # DobotをZ=-35の位置まで降下させる。
-            pose["z"] = self.RecordPose["z"].copy()
-            SetPoseAct(self.api, pose=pose, ptpMoveMode=values["-MoveMode-"])
-            # グリッパを閉じる。
-            GripperAutoCtrl(self.api)
-            # DobotをZ=20の位置まで上昇させる。
-            # pose["z"] = self.CurrentPose["z"]
-            pose["z"] = 20
-            SetPoseAct(self.api, pose=pose, ptpMoveMode=values["-MoveMode-"])
-            # 退避位置まで移動させる。
-            pose = self.RecordPose.copy()
-            # DobotをZ=20の位置まで上昇させる。
-            pose["z"] = 20
-            SetPoseAct(
-                self.api,
-                pose=pose,
-                ptpMoveMode=values["-MoveMode-"],
-            )
-            # DobotをZ=-35の位置まで降下させる。
-            pose["z"] = self.RecordPose["z"].copy()
-            SetPoseAct(self.api, pose=pose, ptpMoveMode=values["-MoveMode-"])
-            # グリッパを開く．
-            GripperAutoCtrl(self.api)
-            # DobotをZ=20の位置まで上昇させる。
-            pose["z"] = 20
-            SetPoseAct(self.api, pose=pose, ptpMoveMode=values["-MoveMode-"])
-            # グリッパを閉じる．
-            GripperAutoCtrl(self.api)
-            # グリッパを初期位置まで移動させる．
-            SetPoseAct(self.api, pose=init_pose, ptpMoveMode=values["-MoveMode-"])
-
-        else:
-            sg.popup("Dobotかカメラが接続されていません。")
+        if not self.connection:
+            sg.popup("Dobotが接続されていません。", title=_Dobot_err[1])
             return
+        if cam is None:
+            sg.popup("カメラが接続されていません。", _WebCam_err[2])
+            return
+
+        dst_org, dst_bin = self.SnapshotBtn(cam, values, drawing=False)
+        # 画像を撮影 & 重心位置を計算
+        err, COG = self.ContoursBtn(dst_org, dst_bin, values, drawing=False)
+
+        if err == 7:
+            sg.popup("画像のチャネル数が不正です。", titile=_WebCam_err[err])
+            return
+        # 最終的に戻ってくる初期位置を保持
+        init_pose = self.InitPose
+        # 現在のDobotの姿勢を取得
+        pose = self.GetPose_UpdateWindow()  # pose -> self.CurrentPose
+        # ------------------------------ #
+        # Dobotの移動後の姿勢を計算 #
+        # ------------------------------ #
+        if len(dst_bin.shape) == 2:
+            h, w = dst_bin.shape
+        elif len(dst_bin.shape) == 3:
+            h, w, _ = dst_bin.shape
+        try:
+            pose["x"] = (
+                self.Alignment_1["x"]
+                + COG[1] * (self.Alignment_2["x"] - self.Alignment_1["x"]) / h
+            )
+            pose["y"] = (
+                self.Alignment_1["y"]
+                + COG[0] * (self.Alignment_2["y"] - self.Alignment_1["y"]) / w
+            )
+        except ZeroDivisionError:  # ゼロ割が発生した場合
+            sg.popup("画像のサイズが計測されていません", title="エラー")
+            return
+
+        # Dobotをオブジェクト重心の真上まで移動させる。
+        SetPoseAct(self.api, pose=pose, ptpMoveMode=values["-MoveMode-"])
+        # エンドエフェクタを推定した角度に回転する．
+        if COG[2] is None:
+            sg.popup("姿勢が推定できませんでした。", titile=_WebCam_err[9])
+            return
+        pose["r"] = COG[2] - 90
+        SetPoseAct(self.api, pose=pose, ptpMoveMode=values["-MoveMode-"])
+        # グリッパーを開く。
+        GripperAutoCtrl(self.api)
+        # DobotをZ=-35の位置まで降下させる。
+        pose["z"] = self.RecordPose["z"]
+        SetPoseAct(self.api, pose=pose, ptpMoveMode=values["-MoveMode-"])
+        # グリッパを閉じる。
+        GripperAutoCtrl(self.api)
+        # DobotをZ=20の位置まで上昇させる。
+        # pose["z"] = self.CurrentPose["z"]
+        pose["z"] = 20
+        SetPoseAct(self.api, pose=pose, ptpMoveMode=values["-MoveMode-"])
+        # 退避位置まで移動させる。
+        pose = self.RecordPose.copy()
+        # DobotをZ=20の位置まで上昇させる。
+        pose["z"] = 20
+        SetPoseAct(
+            self.api,
+            pose=pose,
+            ptpMoveMode=values["-MoveMode-"],
+        )
+        # DobotをZ=-35の位置まで降下させる。
+        pose["z"] = self.RecordPose["z"]
+        SetPoseAct(self.api, pose=pose, ptpMoveMode=values["-MoveMode-"])
+        # グリッパを開く．
+        GripperAutoCtrl(self.api)
+        # DobotをZ=20の位置まで上昇させる。
+        pose["z"] = 20
+        SetPoseAct(self.api, pose=pose, ptpMoveMode=values["-MoveMode-"])
+        # グリッパを閉じる．
+        GripperAutoCtrl(self.api)
+        # グリッパを初期位置まで移動させる．
+        SetPoseAct(self.api, pose=init_pose, ptpMoveMode=values["-MoveMode-"])
 
     def Task3(self, cam: cv2.VideoCapture, values: list):
         """
@@ -2074,33 +2091,34 @@ class Dobot_APP:
             cam (cv2.VideoCapture): 接続しているカメラ情報
             values (list): ウインドウ上のボタンの状態などを記録している変数
         """
-        if (
-            self.connection
-            and (type(cam) == cv2.VideoCapture)
-            and (values["-Binarization-"] != "なし")
-        ):
-            try:
-                vf = VisualFeedback(self.api, cam, values)
-            except Exception as e:
-                sg.popup(e, title="VF コントロールエラー")
-                return
-            else:
-                data = vf.run(target="vf")
-
-            if (
-                data is not None
-                and data["pose"] is not None
-                and data["COG"] is not None
-            ):
-                self.current_pose = data["pose"]
-                self.Window["-CenterOfGravity_x-"].update(str(data["COG"][0]))
-                self.Window["-CenterOfGravity_y-"].update(str(data["COG"][1]))
-            else:
-                sg.popup("VF の戻り値が正常に取得できませんでした．")
-                return
-        else:
-            sg.popup("Dobotかカメラが接続されていない。もしくは，画像が二値化されていません．")
+        if not self.connection:
+            sg.popup("Dobotが接続されていません。", title=_Dobot_err[1])
             return
+        if cam is None:
+            sg.popup("カメラが接続されていません。", _WebCam_err[2])
+            return
+        if values["-Binarization-"] == "なし":
+            sg.popup("画像の二値化処理が指定されていません。", title=_WebCam_err[7])
+            return
+
+        try:
+            vf = VisualFeedback(self.api, cam, values)
+        except Exception as e:
+            sg.popup(e, title="VF コントロールエラー")
+            return
+        else:
+            data = vf.run(target="vf")
+
+        if data is None:
+            sg.popup("VF の戻り値が正常に取得できませんでした．")
+            return
+        if data["pose"] is None:
+            sg.popup("Dobotの姿勢を取得できませんでした．")
+            return
+
+        self.current_pose = data["pose"]
+        self.Window["-CenterOfGravity_x-"].update(str(data["COG"][0]))
+        self.Window["-CenterOfGravity_y-"].update(str(data["COG"][1]))
 
     def Task4(self, cam: cv2.VideoCapture, values: list):
         """
@@ -2110,205 +2128,209 @@ class Dobot_APP:
             cam (cv2.VideoCapture): 接続しているカメラ情報
             values (list): ウインドウ上のボタンの状態などを記録している変数
         """
-        if (
-            self.connection
-            and (type(cam) == cv2.VideoCapture)
-            and (values["-Binarization-"] != "なし")
-            and (self.RecordPose)
-        ):
-            try:
-                vf = VisualFeedback(self.api, cam, values)
-            except Exception as e:
-                sg.popup(e, title="VF コントロールエラー")
-                return
-            else:
-                data = vf.run(target="vf")
-
-            if (
-                data is not None
-                and data["pose"] is not None
-                and data["COG"] is not None
-            ):
-                # 最終的に戻ってくる初期位置を保持
-                init_pose = self.InitPose
-                # 現在のDobotの姿勢を取得
-                pose = self.GetPose_UpdateWindow()  # pose -> self.CurrentPose
-                self.Window["-CenterOfGravity_x-"].update(str(data["COG"][0]))
-                self.Window["-CenterOfGravity_y-"].update(str(data["COG"][1]))
-                self.Window["-Angle-"].update(str(data["COG"][2]))
-            else:
-                sg.popup("VF の戻り値が正常に取得できませんでした．")
-                return
-
-            # Dobotをオブジェクト重心の真上まで移動させる。
-            offset = self.OffSet(values)
-            if offset is not None:
-                pose["x"] += offset["x"]
-                pose["y"] += offset["y"]
-            SetPoseAct(self.api, pose=pose, ptpMoveMode=values["-MoveMode-"])
-            # エンドエフェクタを推定した角度に回転する．
-            if data["COG"][2] is not None:
-                pose["r"] = data["COG"][2] - 90
-                SetPoseAct(self.api, pose=pose, ptpMoveMode=values["-MoveMode-"])
-            # グリッパーを開く。
-            GripperAutoCtrl(self.api)
-            # DobotをZ=-35の位置まで降下させる。
-            pose["z"] = self.RecordPose["z"].copy()
-            SetPoseAct(self.api, pose=pose, ptpMoveMode=values["-MoveMode-"])
-            # グリッパを閉じる。
-            GripperAutoCtrl(self.api)
-            # DobotをZ=20の位置まで上昇させる。
-            # pose["z"] = self.CurrentPose["z"]
-            pose["z"] = 20
-            SetPoseAct(self.api, pose=pose, ptpMoveMode=values["-MoveMode-"])
-            # 退避位置まで移動させる。
-            pose = self.RecordPose.copy()
-            # DobotをZ=20の位置まで上昇させる。
-            pose["z"] = 20
-            SetPoseAct(
-                self.api,
-                pose=pose,
-                ptpMoveMode=values["-MoveMode-"],
-            )
-            # DobotをZ=-35の位置まで降下させる。
-            pose["z"] = self.RecordPose["z"].copy()
-            SetPoseAct(self.api, pose=pose, ptpMoveMode=values["-MoveMode-"])
-            # グリッパを開く．
-            GripperAutoCtrl(self.api)
-            # DobotをZ=20の位置まで上昇させる。
-            pose["z"] = 20
-            SetPoseAct(self.api, pose=pose, ptpMoveMode=values["-MoveMode-"])
-            # グリッパを閉じる．
-            GripperAutoCtrl(self.api)
-            # グリッパを初期位置まで移動させる．
-            SetPoseAct(self.api, pose=init_pose, ptpMoveMode=values["-MoveMode-"])
-
-        else:
-            sg.popup("Dobotかカメラが接続されていない。もしくは，画像が二値化されていません．")
+        if not self.connection:
+            sg.popup("Dobotが接続されていません。", title=_Dobot_err[1])
             return
+        if cam is None:
+            sg.popup("カメラが接続されていません。", _WebCam_err[2])
+            return
+        if values["-Binarization-"] == "なし":
+            sg.popup("画像の二値化処理が指定されていません。", title=_WebCam_err[7])
+            return
+
+        try:
+            vf = VisualFeedback(self.api, cam, values)
+        except Exception as e:
+            sg.popup(e, title="VF コントロールエラー")
+            return
+        else:
+            data = vf.run(target="vf")
+
+        if data is None:
+            sg.popup("VF の戻り値が正常に取得できませんでした．")
+            return
+        if data["pose"] is None:
+            sg.popup("Dobotの姿勢を取得できませんでした．")
+            return
+        # 最終的に戻ってくる初期位置を保持
+        init_pose = self.InitPose
+        # 現在のDobotの姿勢を取得
+        pose = self.GetPose_UpdateWindow()  # pose -> self.CurrentPose
+        self.Window["-CenterOfGravity_x-"].update(str(data["COG"][0]))
+        self.Window["-CenterOfGravity_y-"].update(str(data["COG"][1]))
+        self.Window["-Angle-"].update(str(data["COG"][2]))
+
+        # Dobotをオブジェクト重心の真上まで移動させる。
+        offset = self.OffSet(values)
+        if offset is not None:
+            pose["x"] += offset["x"]
+            pose["y"] += offset["y"]
+        SetPoseAct(self.api, pose=pose, ptpMoveMode=values["-MoveMode-"])
+        # エンドエフェクタを推定した角度に回転する．
+        if data["COG"][2] is not None:
+            pose["r"] = data["COG"][2] - 90
+            SetPoseAct(self.api, pose=pose, ptpMoveMode=values["-MoveMode-"])
+        # グリッパーを開く。
+        GripperAutoCtrl(self.api)
+        # DobotをZ=-35の位置まで降下させる。
+        pose["z"] = self.RecordPose["z"]
+        SetPoseAct(self.api, pose=pose, ptpMoveMode=values["-MoveMode-"])
+        # グリッパを閉じる。
+        GripperAutoCtrl(self.api)
+        # DobotをZ=20の位置まで上昇させる。
+        # pose["z"] = self.CurrentPose["z"]
+        pose["z"] = 20
+        SetPoseAct(self.api, pose=pose, ptpMoveMode=values["-MoveMode-"])
+        # 退避位置まで移動させる。
+        pose = self.RecordPose.copy()
+        # DobotをZ=20の位置まで上昇させる。
+        pose["z"] = 20
+        SetPoseAct(
+            self.api,
+            pose=pose,
+            ptpMoveMode=values["-MoveMode-"],
+        )
+        # DobotをZ=-35の位置まで降下させる。
+        pose["z"] = self.RecordPose["z"]
+        SetPoseAct(self.api, pose=pose, ptpMoveMode=values["-MoveMode-"])
+        # グリッパを開く．
+        GripperAutoCtrl(self.api)
+        # DobotをZ=20の位置まで上昇させる。
+        pose["z"] = 20
+        SetPoseAct(self.api, pose=pose, ptpMoveMode=values["-MoveMode-"])
+        # グリッパを閉じる．
+        GripperAutoCtrl(self.api)
+        # グリッパを初期位置まで移動させる．
+        SetPoseAct(self.api, pose=init_pose, ptpMoveMode=values["-MoveMode-"])
 
     def Task5(
         self, main_cam: cv2.VideoCapture, sub_cam: cv2.VideoCapture, values: list
     ):
-        if (
-            self.connection
-            and (type(main_cam) == cv2.VideoCapture)
-            and (type(sub_cam) == cv2.VideoCapture)
-            and (values["-Binarization-"] != "なし")
-            and (self.RecordPose)
-        ):
-            dst_org = dst_bin = None
-            COG = []
-            # 最終的に戻ってくる初期位置を保持
-            # init_pose = self.GetPose_UpdateWindow()  # pose -> self.CurrentPose
-            init_pose = self.InitPose
-            # Dobotを初期位置まで移動させる。
-            SetPoseAct(self.api, pose=init_pose, ptpMoveMode=values["-MoveMode-"])
-
-            # VF Class のインスタンスを作成
-            try:
-                vf = VisualFeedback(self.api, sub_cam, values)
-            except Exception as e:
-                sg.popup(e, title="VF コントロールエラー")
-                return
-
-            dst_org, dst_bin = self.SnapshotBtn(main_cam, values, drawing=False)
-            # 画像を撮影 & 重心位置を計算
-            err, COG = self.ContoursBtn(dst_org, dst_bin, values, drawing=False)
-
-            if err == 7 or not COG:
-                return
-
-            # 現在のDobotの姿勢を取得
-            pose = self.GetPose_UpdateWindow()  # pose -> self.CurrentPose
-            # ------------------------------ #
-            # Dobotの移動後の姿勢を計算 #
-            # ------------------------------ #
-            if len(dst_bin.shape) == 2:
-                h, w = dst_bin.shape
-            elif len(dst_bin.shape) == 3:
-                h, w, _ = dst_bin.shape
-            try:
-                pose["x"] = (
-                    self.Alignment_1["x"]
-                    + COG[1] * (self.Alignment_2["x"] - self.Alignment_1["x"]) / h
-                )
-                pose["y"] = (
-                    self.Alignment_1["y"]
-                    + COG[0] * (self.Alignment_2["y"] - self.Alignment_1["y"]) / w
-                )
-            except ZeroDivisionError:  # ゼロ割が発生した場合
-                sg.popup("画像のサイズが計測されていません", title="エラー")
-                return
-
-            # Dobotをオブジェクト重心の真上まで移動させる。
-            SetPoseAct(self.api, pose=pose, ptpMoveMode=values["-MoveMode-"])
-            time.sleep(2)
-            data = vf.run(target="vf")
-
-            if (
-                data is not None
-                and data["pose"] is not None
-                and data["COG"] is not None
-            ):
-                # 最終的に戻ってくる初期位置を保持
-                # init_pose = self.GetPose_UpdateWindow()  # pose -> self.CurrentPose
-                # 現在のDobotの姿勢を取得
-                pose = self.GetPose_UpdateWindow()  # pose -> self.CurrentPose
-                self.Window["-CenterOfGravity_x-"].update(str(data["COG"][0]))
-                self.Window["-CenterOfGravity_y-"].update(str(data["COG"][1]))
-                self.Window["-Angle-"].update(str(data["COG"][2]))
-                del vf
-            else:
-                sg.popup("VF の戻り値が正常に取得できませんでした．")
-                return
-
-            # Dobotをオブジェクト重心の真上まで移動させる。
-            offset = self.OffSet(values)
-            if offset is not None:
-                pose["x"] += offset["x"]
-                pose["y"] += offset["y"]
-            SetPoseAct(self.api, pose=pose, ptpMoveMode=values["-MoveMode-"])
-            # エンドエフェクタを推定した角度に回転する．
-            if data["COG"][2] is not None:
-                pose["r"] = data["COG"][2] - 90
-                SetPoseAct(self.api, pose=pose, ptpMoveMode=values["-MoveMode-"])
-            # グリッパーを開く。
-            GripperAutoCtrl(self.api)
-            # DobotをZ=-35の位置まで降下させる。
-            pose["z"] = self.RecordPose["z"].copy()
-            SetPoseAct(self.api, pose=pose, ptpMoveMode=values["-MoveMode-"])
-            # グリッパを閉じる。
-            GripperAutoCtrl(self.api)
-            # DobotをZ=20の位置まで上昇させる。
-            # pose["z"] = self.CurrentPose["z"]
-            pose["z"] = 20
-            SetPoseAct(self.api, pose=pose, ptpMoveMode=values["-MoveMode-"])
-            # 退避位置まで移動させる。
-            pose = self.RecordPose.copy()
-            # DobotをZ=20の位置まで上昇させる。
-            pose["z"] = 20
-            SetPoseAct(
-                self.api,
-                pose=pose,
-                ptpMoveMode=values["-MoveMode-"],
-            )
-            # DobotをZ=-35の位置まで降下させる。
-            pose["z"] = self.RecordPose["z"].copy()
-            SetPoseAct(self.api, pose=pose, ptpMoveMode=values["-MoveMode-"])
-            # グリッパを開く．
-            GripperAutoCtrl(self.api)
-            # DobotをZ=20の位置まで上昇させる。
-            pose["z"] = 20
-            SetPoseAct(self.api, pose=pose, ptpMoveMode=values["-MoveMode-"])
-            # グリッパを閉じる．
-            GripperAutoCtrl(self.api)
-            # グリッパを初期位置まで移動させる．
-            SetPoseAct(self.api, pose=init_pose, ptpMoveMode=values["-MoveMode-"])
-
-        else:
-            sg.popup("Dobotかカメラが接続されていない。もしくは，画像が二値化されていません．")
+        if not self.connection:
+            sg.popup("Dobotが接続されていません。", title=_Dobot_err[1])
             return
+        if not self.RecordPose:
+            sg.popup("物体の退避位置が設定されていません。", title=_Dobot_err[6])
+            return
+        if main_cam is None:
+            sg.popup("メインカメラが接続されていない。もしくは選択されていません。", _WebCam_err[2])
+            return
+        if sub_cam is None:
+            sg.popup("サブカメラが接続されていない。もしくは選択されていません。", _WebCam_err[2])
+            return
+        if values["-Binarization-"] == "なし":
+            sg.popup("画像の二値化処理が指定されていません。", title=_WebCam_err[7])
+            return
+
+        dst_org = dst_bin = None
+        COG = []
+        # 最終的に戻ってくる初期位置を保持
+        # init_pose = self.GetPose_UpdateWindow()  # pose -> self.CurrentPose
+        init_pose = self.InitPose
+        # Dobotを初期位置まで移動させる。
+        SetPoseAct(self.api, pose=init_pose, ptpMoveMode=values["-MoveMode-"])
+
+        # VF Class のインスタンスを作成
+        try:
+            vf = VisualFeedback(self.api, sub_cam, values)
+        except Exception as e:
+            sg.popup(e, title="VF コントロールエラー")
+            return
+
+        dst_org, dst_bin = self.SnapshotBtn(main_cam, values, drawing=False)
+        # 画像を撮影 & 重心位置を計算
+        err, COG = self.ContoursBtn(dst_org, dst_bin, values, drawing=False)
+
+        if err == 7:
+            sg.popup("画像のチャネル数が不正です。", titile=_WebCam_err[err])
+            return
+
+        if not COG:
+            sg.popup("重心位置を計算できませんでした．", title=_WebCam_err[9])
+            return
+
+        # 現在のDobotの姿勢を取得
+        pose = self.GetPose_UpdateWindow()  # pose -> self.CurrentPose
+        # ------------------------------ #
+        # Dobotの移動後の姿勢を計算 #
+        # ------------------------------ #
+        if len(dst_bin.shape) == 2:
+            h, w = dst_bin.shape
+        elif len(dst_bin.shape) == 3:
+            h, w, _ = dst_bin.shape
+        try:
+            pose["x"] = (
+                self.Alignment_1["x"]
+                + COG[1] * (self.Alignment_2["x"] - self.Alignment_1["x"]) / h
+            )
+            pose["y"] = (
+                self.Alignment_1["y"]
+                + COG[0] * (self.Alignment_2["y"] - self.Alignment_1["y"]) / w
+            )
+        except ZeroDivisionError:  # ゼロ割が発生した場合
+            sg.popup("画像のサイズが計測されていません", title="エラー")
+            return
+
+        # Dobotをオブジェクト重心の真上まで移動させる。
+        SetPoseAct(self.api, pose=pose, ptpMoveMode=values["-MoveMode-"])
+        time.sleep(2)
+        data = vf.run(target="vf")
+
+        if data is None:
+            sg.popup("VF の戻り値が正常に取得できませんでした．")
+            return
+        if data["pose"] is None:
+            sg.popup("Dobotの姿勢を取得できませんでした．")
+            return
+        # 現在のDobotの姿勢を取得
+        pose = self.GetPose_UpdateWindow()  # pose -> self.CurrentPose
+        self.Window["-CenterOfGravity_x-"].update(str(data["COG"][0]))
+        self.Window["-CenterOfGravity_y-"].update(str(data["COG"][1]))
+        self.Window["-Angle-"].update(str(data["COG"][2]))
+        del vf
+
+        # Dobotをオブジェクト重心の真上まで移動させる。
+        offset = self.OffSet(values)
+        if offset is not None:
+            pose["x"] += offset["x"]
+            pose["y"] += offset["y"]
+        SetPoseAct(self.api, pose=pose, ptpMoveMode=values["-MoveMode-"])
+        # エンドエフェクタを推定した角度に回転する．
+        if data["COG"][2] is not None:
+            pose["r"] = data["COG"][2] - 90
+            SetPoseAct(self.api, pose=pose, ptpMoveMode=values["-MoveMode-"])
+        # グリッパーを開く。
+        GripperAutoCtrl(self.api)
+        # DobotをZ=-35の位置まで降下させる。
+        pose["z"] = self.RecordPose["z"]
+        SetPoseAct(self.api, pose=pose, ptpMoveMode=values["-MoveMode-"])
+        # グリッパを閉じる。
+        GripperAutoCtrl(self.api)
+        # DobotをZ=20の位置まで上昇させる。
+        # pose["z"] = self.CurrentPose["z"]
+        pose["z"] = 20
+        SetPoseAct(self.api, pose=pose, ptpMoveMode=values["-MoveMode-"])
+        # 退避位置まで移動させる。
+        pose = self.RecordPose.copy()
+        # DobotをZ=20の位置まで上昇させる。
+        pose["z"] = 20
+        SetPoseAct(
+            self.api,
+            pose=pose,
+            ptpMoveMode=values["-MoveMode-"],
+        )
+        # DobotをZ=-35の位置まで降下させる。
+        pose["z"] = self.RecordPose["z"]
+        SetPoseAct(self.api, pose=pose, ptpMoveMode=values["-MoveMode-"])
+        # グリッパを開く．
+        GripperAutoCtrl(self.api)
+        # DobotをZ=20の位置まで上昇させる。
+        pose["z"] = 20
+        SetPoseAct(self.api, pose=pose, ptpMoveMode=values["-MoveMode-"])
+        # グリッパを閉じる．
+        GripperAutoCtrl(self.api)
+        # グリッパを初期位置まで移動させる．
+        SetPoseAct(self.api, pose=init_pose, ptpMoveMode=values["-MoveMode-"])
 
 
 def WebCamOption(device_name: str) -> int:

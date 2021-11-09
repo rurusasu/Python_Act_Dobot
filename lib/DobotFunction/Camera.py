@@ -7,6 +7,7 @@ sys.path.append("..")
 import cv2
 import numpy as np
 import matplotlib.pyplot as plt
+import threading
 
 from lib.utils.ImageProcessing.Binarization import (
     GlobalThreshold,
@@ -64,6 +65,9 @@ def WebCam_OnOff(device_num: int, cam: Union[cv2.VideoCapture, None] = None):
     """
     if cam is None:  # カメラが接続されていないとき
         cam = cv2.VideoCapture(device_num, cv2.CAP_DSHOW)
+        # バッファサイズを小さくすることによる高速化
+        # REF: https://qiita.com/iwatake2222/items/b8c442a9ec0406883950
+        cam.set(cv2.CAP_PROP_BUFFERSIZE, 1)
         # カメラに接続できなかった場合
         if not cam.isOpened():
             return 2, None
@@ -75,6 +79,63 @@ def WebCam_OnOff(device_num: int, cam: Union[cv2.VideoCapture, None] = None):
         cam.release()
         cv2.destroyAllWindows()
         return 1, None
+
+
+# bufferless VideoCapture
+class VideoCaptureWrapper:
+    def __init__(self, device_num: int, cam: Union[cv2.VideoCapture, None] = None):
+        """
+        WebCameraを読み込む関数
+
+        Args:
+            device_num (int): カメラデバイスを番号で指定
+                0:PC内臓カメラ
+                1:外部カメラ
+            cam (Union[cv2.VideoCapture, None], optional): 接続しているカメラ情報. Defaults to None.
+
+        Returns:
+            response(int): 動作終了を表すフラグ
+                0: connect
+                1: release
+                2: NotFound
+            capture(cv2.VideoCapture): 接続したデバイス情報を返す
+                cv2.VideoCapture: connect
+                None: release or NotFound
+        """
+        if cam is None:  # カメラが接続されていないとき
+            self.cam = cv2.VideoCapture(device_num)
+            # バッファサイズを小さくすることによる高速化
+            # REF: https://qiita.com/iwatake2222/items/b8c442a9ec0406883950
+            self.cam.set(cv2.CAP_PROP_BUFFERSIZE, 1)
+            # カメラに接続できなかった場合
+            if not self.cam.isOpened():
+                self.err_num = 2
+            # 接続できた場合
+            else:
+                self.t = threading.Thread(target=self._reader)
+                self.t.daemon = True
+                self.t.start()
+                self.err_num = 0
+
+    def isError(self):
+        return self.err_num
+
+    def release(self):
+        self.cam.release()
+        cv2.destroyAllWindows()
+        return 1, None
+
+    # grab frames as soon as they are available
+    def _reader(self):
+        while True:
+            ret = self.cam.grab()
+            if not ret:
+                break
+
+    # retrieve latest frame
+    def read(self):
+        ret, frame = self.cam.retrieve()
+        return ret, frame
 
 
 def Snapshot(cam: cv2.VideoCapture) -> np.ndarray:
@@ -210,7 +271,7 @@ def ImageCvt(
     AdaptiveThreshold_BlockSize: int = 11,
     AdaptiveThreshold_Constant: int = 2,
     color: int = 4,
-) -> Tuple[int, np.ndarray]:
+) -> Tuple[int, np.ndarray, np.ndarray]:
     dst = img.copy()
 
     # ---------------------------
@@ -287,7 +348,7 @@ def SnapshotCvt(
     err, dst_org = Snapshot(cam)
 
     if err != 3:
-        return 4, []  # WebCam_NotGetImage
+        return 4, [], []  # WebCam_NotGetImage
 
     err, _, dst_bin = ImageCvt(
         dst_org,
