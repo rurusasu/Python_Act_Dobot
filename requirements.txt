@@ -1,3 +1,4 @@
+albumentations
 easydict
 matplotlib
 numpy
@@ -8,3 +9,4 @@ scikit-image
 scipy
 timeout
 timeout-decorator
+timm

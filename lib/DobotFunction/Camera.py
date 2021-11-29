@@ -85,22 +85,14 @@ def WebCam_OnOff(device_num: int, cam: Union[cv2.VideoCapture, None] = None):
 class VideoCaptureWrapper:
     def __init__(self, device_num: int, cam: Union[cv2.VideoCapture, None] = None):
         """
-        WebCameraを読み込む関数
+        WebCameraを読み込むクラス
+        参考: [opencvのキャプチャデバイス（カメラ）から最新のフレームを取得する方法](https://stackoverflow.com/questions/43665208/how-to-get-the-latest-frame-from-capture-device-camera-in-opencv)
 
         Args:
             device_num (int): カメラデバイスを番号で指定
                 0:PC内臓カメラ
                 1:外部カメラ
             cam (Union[cv2.VideoCapture, None], optional): 接続しているカメラ情報. Defaults to None.
-
-        Returns:
-            response(int): 動作終了を表すフラグ
-                0: connect
-                1: release
-                2: NotFound
-            capture(cv2.VideoCapture): 接続したデバイス情報を返す
-                cv2.VideoCapture: connect
-                None: release or NotFound
         """
         if cam is None:  # カメラが接続されていないとき
             self.cam = cv2.VideoCapture(device_num)
@@ -117,12 +109,24 @@ class VideoCaptureWrapper:
                 self.t.start()
                 self.err_num = 0
 
-    def isError(self):
+    def isError(self) -> int:
+        """カメラ接続/解放時のエラーを返す関数．
+
+        Returns:
+            response(int): 動作終了を表すフラグ
+                0: connect
+                2: NotFound
+        """
         return self.err_num
 
-    def release(self):
+    def release(self) -> Tuple[int, None]:
+        """カメラを解放する関数
+
+        Returns:
+            response(int): 動作終了を表すフラグ
+                1: release
+        """
         self.cam.release()
-        cv2.destroyAllWindows()
         return 1, None
 
     # grab frames as soon as they are available

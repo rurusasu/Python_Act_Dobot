@@ -3,7 +3,7 @@ import json
 from typing import Dict
 
 
-def ReadNdjsonToDict(r_json_pth: str) -> Dict:
+def ReadJsonToDict(r_json_pth: str) -> Dict:
     """
     Ndjson ファイルからデータを読みだす関数．
     json は，保存したい全てのデータを一度読みだしておく必要があるが ndjson は，1つ1つのデータを順次保存することができる．
@@ -27,7 +27,7 @@ def ReadNdjsonToDict(r_json_pth: str) -> Dict:
     return data
 
 
-def WriteDataToNdjson(data: Dict, wt_json_pth: str):
+def WriteDataToJson(data: Dict, wt_json_pth: str):
     """
     データを追記する形で JSON ファイルに出力する関数．
     json は，保存したい全てのデータを一度読みだしておく必要があるが ndjson は，1つ1つのデータを順次保存することができる．
