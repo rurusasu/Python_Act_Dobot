@@ -1,8 +1,7 @@
-import time
 import sys
 from queue import Queue
-from typing import Dict, List, Literal, Union
-from threading import Thread
+from typing import Any, Callable, Dict, Iterable, List, Literal, Mapping, Union
+from threading import Thread, Timer
 
 sys.path.append("../../")
 
@@ -335,7 +334,47 @@ class VisualFeedback(object):
                 return ui_data
 
 
+class VisualFeedback2(Timer):
+    def __init__(
+        self,
+        interval: float,
+        function: Callable[..., Any],
+        args: Union[Iterable[Any], None] = [],
+        kwargs: Union[Mapping[str, Any], None] = {},
+    ) -> None:
+        Timer.__init__(self, interval, self.run, args, kwargs)
+        self.thread = None
+        # self.function = function
+        self.err = 0
+        self.err_2 = 1
+        self.function = VF
+
+    def run(self):
+        self.thread = Timer(self.interval, self.run)
+        self.thread.start()
+        self.function(**{"err": self.err, "err_2": self.err_2})
+
+    def cancel(self):
+        if self.thread is not None:
+            self.thread.cancel()
+            self.thread.join()
+            del self.thread
+
+    def GetValue(self):
+        return self.err, self.err_2
+
+
+def VF(err, err_2):
+    err += 1
+    err_2 += 10
+
+    return err, err_2
+
+
 if __name__ == "__main__":
+    import time
+
+    """
     from lib.DobotDLL import DobotDllType as dType
     from lib.DobotFunction.Communication import (
         Connect_Disconnect,
@@ -371,5 +410,20 @@ if __name__ == "__main__":
         device_num = 1
         cam = cv2.VideoCapture(device_num, cv2.CAP_DSHOW)
 
-        vf = VisualFeedback(api, cam, values)
-        vf.run(target="vf")
+        # vf = VisualFeedback(api, cam, values)
+        # vf.run(target="vf")
+    """
+
+    def hello():
+        print("hello")
+
+    def count(x: int):
+        x += 1
+        print(x)
+
+    i = 2
+    vf = VisualFeedback2(1, count, [i])
+    vf.start()
+    time.sleep(5)
+    err, err_2 = vf.GetValue()
+    print(err, err_2)
