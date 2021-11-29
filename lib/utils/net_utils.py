@@ -1,3 +1,4 @@
+from typing import List, Tuple
 import albumentations as albm
 import numpy as np
 import torch
@@ -29,7 +30,21 @@ def CropImage(img: np.ndarray, mask: np.ndarray):
     return transformd_img["image"]
 
 
-def predict(img: np.ndarray, mask_img, network: torch.nn):
+def predict(
+    img: np.ndarray, mask_img: np.ndarray, network: torch.nn
+) -> Tuple[np.ndarray, int]:
+    """
+    1. マスク画像を用いてオブジェクトを正方形に切り出し，CNNへの入力画像を作成する．
+    2. CNN で画像ないオブジェクトの姿勢を推定する．
+
+    Args:
+        img (np.ndarray): rgb 画像．
+        mask_img (np.ndarray): 切り出すマスク画像．
+        network (torch.nn): 姿勢推定に使用するネットワーク．
+
+    Returns:
+        Tuple[np.ndarray, int]: 正方形に切り出した画像と推定したクラス番号．
+    """
     # マスクされた部分の画像を切り取る．
     crop_img = CropImage(img, mask=mask_img)
     # numpy -> tensor
