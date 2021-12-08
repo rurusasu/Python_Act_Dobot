@@ -344,10 +344,11 @@ class VisualFeedback2(Timer):
     ) -> None:
         Timer.__init__(self, interval, self.run, args, kwargs)
         self.thread = None
-        # self.function = function
-        self.err = 0
-        self.err_2 = 1
-        self.function = VF
+        self.function = function
+        # self.err = 0
+        # self.err_2 = 1
+        self.data_que = Queue()  # ワーカープロセスへ送るデータ
+        self.ui_que = Queue()  # ワーカーから送られてくるデータ
 
     def run(self):
         self.thread = Timer(self.interval, self.run)

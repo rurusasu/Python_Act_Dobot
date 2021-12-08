@@ -1,7 +1,7 @@
+# -*- coding: utf-8 -*-
+
 import sys, os
 from typing import Dict, List, Tuple, Union
-
-from PySimpleGUI.PySimpleGUI import I
 
 sys.path.append(".")
 sys.path.append("..")
@@ -124,7 +124,7 @@ class Dobot_APP:
     def __init__(self):
         # dll_path = cfg.DOBOT_DLL_DIR + os.sep + "DobotDll.dll"
         # self.api = cdll.LoadLibrary(dll_path)
-        self.api = dType.load()  # Dobot 制御ライブラリの読み出し
+        self.api = None
         # self.api = dType.load()
         self.connection = False  # Dobotの接続状態
         self.InitPose = {
@@ -203,7 +203,7 @@ class Dobot_APP:
         # タスク
         Task = [
             [
-                sg.Button("タスク実行", size=(9, 1), disabled=True, key="-Task-"),
+                sg.Button(u"Tasks", size=(9, 1), disabled=True, key="-Task-"),
                 sg.InputCombo(
                     ("Task_1", "Task_2", "Task_3", "Task_4", "Task_5", "Task_6"),
                     default_value="Task_1",
@@ -1096,6 +1096,9 @@ class Dobot_APP:
         # ---------------------------------------------
         if event == "-Connect-":
             # self.connection = self.Connect_Disconnect_click(self.connection, self.api)
+            if self.api is not None:
+                self.api = dType.load()  # Dobot 制御ライブラリの読み出し
+
             self.connection, err = Connect_Disconnect(
                 self.connection,
                 self.api,

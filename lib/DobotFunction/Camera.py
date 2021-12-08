@@ -3,6 +3,7 @@ from typing import Tuple, Union, List, Literal
 
 sys.path.append(".")
 sys.path.append("..")
+sys.path.append("../../")
 
 import cv2
 import numpy as np
