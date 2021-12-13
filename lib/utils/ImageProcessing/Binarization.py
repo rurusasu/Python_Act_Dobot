@@ -16,6 +16,7 @@ def GlobalThreshold(
     img: np.ndarray,
     threshold: int = 127,
     Type: Literal["cv2", "Otsu"] = "cv2",
+    color: int = 4,
 ) -> np.ndarray:
     """
     画素値が閾値より大きければある値(白色'255')を割り当て，そうでなければ別の値(黒色)を割り当てる。
@@ -26,11 +27,12 @@ def GlobalThreshold(
             変換前の画像
         threshold (int optional):
             2値化するときの閾値(0 <= th <= 255)
-            default: 127
+            Default to 127
         Type (Literal["cv2", "Otsu"] optional):
             閾値の処理方法
-            * "cv2": OpenCVの関数を用いて二値化を行う: default
+            * "cv2": OpenCVの関数を用いて二値化を行う
             * "Otsu: 大津の二値化処理
+            Default to "cv2"
 
     Returns:
         dst (np.ndarray):

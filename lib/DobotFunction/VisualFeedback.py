@@ -3,6 +3,8 @@ from queue import Queue
 from typing import Any, Callable, Dict, Iterable, List, Literal, Mapping, Union
 from threading import Thread, Timer
 
+from numpy import uint
+
 sys.path.append("../../")
 
 import cv2
@@ -345,14 +347,12 @@ class VisualFeedback2(Timer):
         Timer.__init__(self, interval, self.run, args, kwargs)
         self.thread = None
         # self.function = function
-        self.err = 0
-        self.err_2 = 1
-        self.function = VF
+        self.function = function
 
     def run(self):
         self.thread = Timer(self.interval, self.run)
         self.thread.start()
-        self.function(**{"err": self.err, "err_2": self.err_2})
+        self.function(*self.args, **self.kwargs)
 
     def cancel(self):
         if self.thread is not None:
@@ -364,66 +364,152 @@ class VisualFeedback2(Timer):
         return self.err, self.err_2
 
 
-def VF(err, err_2):
-    err += 1
-    err_2 += 10
+def VF(
+    ui_que: Queue,
+    cam: cv2.VideoCapture,
+    Color_Space: Literal["RGB", "Gray"] = "RGB",
+    Color_Density: Literal["なし", "線形濃度変換", "非線形濃度変換", "ヒストグラム平坦化"] = "なし",
+    Binarization: Literal["なし", "Global", "Otsu", "Adaptive", "Two"] = "なし",
+    LowerThreshold: int = 10,
+    UpperThreshold: int = 150,
+    AdaptiveThreshold_type: Literal["Mean", "Gaussian", "Wellner"] = "Mean",
+    AdaptiveThreshold_BlockSize: int = 11,
+    AdaptiveThreshold_Constant: int = 2,
+    color: int = 4,
+    CalcCOG: Literal["画像から重心を計算", "輪郭から重心を計算"] = "輪郭から重心を計算",
+    Retrieval: Literal[
+        "親子関係を無視する", "最外の輪郭を検出する", "2つの階層に分類する", "全階層情報を保持する"
+    ] = "最外の輪郭を検出する",
+    Approximate: Literal["中間点を保持する", "中間点を保持しない"] = "中間点を保持しない",
+    orientation: bool = False,
+    drawing_figure: bool = True,
+    K_p: float = 0.1,
+    K_i: float = 0.01,
+):
 
-    return err, err_2
+    # 偏差
+    sum_err = {
+        "x": 0,  # サンプリング時間毎にx方向の誤差を積分していく ⇒ この誤差はx方向の積分制御で必要
+        "y": 0,  # サンプリング時間毎にy方向の誤差を積分していく ⇒ この誤差はy方向の積分制御で必要
+    }
+
+    return_param = {"pose": None, "COG": []}
+
+    try:
+        # スナップショット撮影
+        res, dst_org, dst_bin = SnapshotCvt(
+            cam,
+            Color_Space=Color_Space,
+            Color_Density=Color_Density,
+            Binarization=Binarization,
+            LowerThreshold=LowerThreshold,
+            UpperThreshold=UpperThreshold,
+            AdaptiveThreshold_type=AdaptiveThreshold_type,
+            AdaptiveThreshold_BlockSize=AdaptiveThreshold_BlockSize,
+            AdaptiveThreshold_Constant=AdaptiveThreshold_Constant,
+            color=color,
+        )
+
+        if res == 4:
+            print("画像処理エラー")
+            ui_que.put(return_param)
+            return
+
+        # 重心位置計算
+        COG, dst_org = Contours(
+            rgb_img=dst_org.copy(),
+            bin_img=dst_bin.copy(),
+            CalcCOG=CalcCOG,
+            Retrieval=Retrieval,
+            Approximate=Approximate,
+            orientation=orientation,
+            drawing_figure=drawing_figure,
+        )
+
+        # 重心位置が取得できなかった場合
+        if not COG:
+            ui_que.put(return_param)
+            return
+        # 重心位置が取得できた場合
+        else:
+            # 画像座標系の中心座標を算出
+            if len(dst_org.shape) == 2:
+                y_r, x_r = dst_org.shape
+            elif len(dst_org.shape) == 3:
+                y_r, x_r, _ = dst_org.shape
+            else:
+                ValueError("Image size is incorrect.")
+            y_r, x_r = y_r / 2, x_r / 2
+    except Exception as e:
+        print(f"Visual Feedback Error: {e}")
+    else:
+        return_param["COG"] = COG
+        ui_que.put(return_param)
+        return
+    finally:
+        ui_que.put(return_param)
+        return
 
 
 if __name__ == "__main__":
     import time
-
-    """
     from lib.DobotDLL import DobotDllType as dType
     from lib.DobotFunction.Communication import (
         Connect_Disconnect,
     )
 
     api = dType.load()  # Dobot 制御ライブラリの読み出し
-    connection = False  # Dobotの接続状態
-    connection = Connect_Disconnect(connection, api)
-    pose = dType.GetPose(api)
+    # connection = False  # Dobotの接続状態
+    # connection = Connect_Disconnect(connection, api)
+    # pose = dType.GetPose(api)
 
-    if connection:
-        values = {
-            "-MoveMode-": "MoveJCoordinate",
-            "-Color_Space-": "RGB",
-            "-Color_Density-": "なし",
-            "-Binarization-": "Two",
-            "-LowerThreshold-": "103",
-            "-UpperThreshold-": "128",
-            "-AdaptiveThreshold_type-": "Mean",
-            "-AdaptiveThreshold_BlockSize-": "11",
-            "-AdaptiveThreshold_Constant-": "2",
-            "-CalcCOGMode-": "輪郭から重心を計算",
-            "-RetrievalMode-": "2つの階層に分類する",
-            "-ApproximateMode-": "中間点を保持する",
-            "-color_R-": False,
-            "-color_G-": False,
-            "-color_B-": True,
-            "-color_W-": False,
-            "-color_Bk-": False,
-            "-Kp-": 0.05,
-            "-Ki-": 0.01,
-        }
-        device_num = 1
-        cam = cv2.VideoCapture(device_num, cv2.CAP_DSHOW)
+    # if connection:
+    values = {
+        "-MoveMode-": "MoveJCoordinate",
+        "-Color_Space-": "RGB",
+        "-Color_Density-": "なし",
+        "-Binarization-": "Two",
+        "-LowerThreshold-": "103",
+        "-UpperThreshold-": "128",
+        "-AdaptiveThreshold_type-": "Mean",
+        "-AdaptiveThreshold_BlockSize-": "11",
+        "-AdaptiveThreshold_Constant-": "2",
+        "-CalcCOGMode-": "輪郭から重心を計算",
+        "-RetrievalMode-": "2つの階層に分類する",
+        "-ApproximateMode-": "中間点を保持する",
+        "-color_R-": False,
+        "-color_G-": False,
+        "-color_B-": True,
+        "-color_W-": False,
+        "-color_Bk-": False,
+        "-Kp-": 0.05,
+        "-Ki-": 0.01,
+    }
+    device_num = 1
+    cam = cv2.VideoCapture(device_num, cv2.CAP_DSHOW)
 
-        # vf = VisualFeedback(api, cam, values)
-        # vf.run(target="vf")
-    """
+    # vf = VisualFeedback(api, cam, values)
+    # vf.run(target="vf")
 
-    def hello():
-        print("hello")
+    # def hello():
+    #     print("hello")
 
-    def count(x: int):
-        x += 1
-        print(x)
+    # def count(x: int):
+    #     x += 1
+    #     print(x)
 
-    i = 2
-    vf = VisualFeedback2(1, count, [i])
+    # i = 2
+    # vf = VisualFeedback2(1, count, [i])
+    # vf.start()
+    # time.sleep(5)
+    # err, err_2 = vf.GetValue()
+    # print(err, err_2)
+
+    ui_que = Queue()
+    vf = VisualFeedback2(
+        1, VF, kwargs={"ui_que": ui_que, "cam": cam, "Binarization": "Two", "color": 2}
+    )
     vf.start()
     time.sleep(5)
-    err, err_2 = vf.GetValue()
-    print(err, err_2)
+    data = ui_que.get_nowait()
+    print(data)

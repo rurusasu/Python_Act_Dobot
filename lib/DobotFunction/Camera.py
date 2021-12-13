@@ -288,9 +288,21 @@ def ImageCvt(
     if Color_Density != "なし":
         dst = Contrast_cvt(dst, Color_Density)
     # 二値化処理
-    if Binarization != "なし":  # 二値化処理
+    if Binarization == "なし":
+        return 5, img, dst
+    else:
         if Binarization == "Global":  # 大域的二値化処理
-            dst = GlobalThreshold(dst, threshold=LowerThreshold)
+            if Color_Space == "RGB":
+                r, g, b = cv2.split(img)
+                if color == 0:  # Red
+                    dst = GlobalThreshold(r, threshold=LowerThreshold)
+                    dst = cv2.bitwise_not(dst)
+                elif color == 1:  # Green
+                    dst = GlobalThreshold(g, threshold=LowerThreshold)
+                elif color == 2:
+                    dst = GlobalThreshold(b, threshold=LowerThreshold)
+            else:
+                dst = GlobalThreshold(dst, threshold=LowerThreshold)
         elif Binarization == "Otsu":  # 大津の二値化処理
             dst = GlobalThreshold(dst, Type="Otsu")
         elif Binarization == "Adaptive":
