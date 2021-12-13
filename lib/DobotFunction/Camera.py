@@ -3,6 +3,7 @@ from typing import Tuple, Union, List, Literal
 
 sys.path.append(".")
 sys.path.append("..")
+sys.path.append("../../")
 
 import cv2
 import numpy as np
@@ -406,7 +407,7 @@ def Contours(
         COG(List[float]): COG=[x, y, angle], オブジェクトの重心座標と，そのオブジェクトの2D平面での回転角度．
         rgb_img (np.ndarray): [W, H, C] の rgb画像．
     """
-    COG = []
+    COG = None
     CalcCOGMode = {
         "画像から重心を計算": 0,
         "輪郭から重心を計算": 1,
