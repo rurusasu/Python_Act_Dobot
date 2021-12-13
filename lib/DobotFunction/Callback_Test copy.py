@@ -213,7 +213,6 @@ def _VF(ui_que:Queue, api, cam: cv2.VideoCapture, values, color, control_law: Li
 if __name__ == "__main__":
     import time
 
-    """
     from lib.DobotDLL import DobotDllType as dType
     from lib.DobotFunction.Communication import (
         Connect_Disconnect,
@@ -249,25 +248,4 @@ if __name__ == "__main__":
         device_num = 1
         cam = cv2.VideoCapture(device_num, cv2.CAP_DSHOW)
 
-        # vf = VisualFeedback(api, cam, values)
-        # vf.run(target="vf")
-    """
-
-    err = 1
-    err_2 = 2
-    vf = VisualFeedback2(1, VF, {err, err_2})
-    vf.start()
-    for i in range(5):
-        print(value, value_2)
-        time.sleep(1)
-    time.sleep(3)
-    data = vf.GetValue()
-    print(data)
-    time.sleep(3)
-    data = vf.GetValue()
-    print(data)
-    print(value, value_2)
-    vf.cancel()
-    data = vf.GetValue()
-    print(data)
-    print(value, value_2)
+        vf = TimerManager(1, _VF, {api, cam, values})
