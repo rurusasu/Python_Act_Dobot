@@ -19,7 +19,8 @@ ptpMoveModeDict = {
 value = 1
 value_2 = 10
 
-class TimerManager():
+
+class TimerManager:
     def __init__(
         self,
         interval: float,
@@ -31,6 +32,7 @@ class TimerManager():
 
     def cancelTimer(self):
         self.tmthread.cancel()
+
 
 class TimerFuction(Timer):
     def __init__(
@@ -61,7 +63,6 @@ class TimerFuction(Timer):
         return self.ui_que.get_nowait()
 
 
-
 def Test(ui_que: Queue, err, err_2) -> Queue:
     global value, value_2
     value += err
@@ -71,7 +72,14 @@ def Test(ui_que: Queue, err, err_2) -> Queue:
     ui_que.put(return_param)
 
 
-def _VF(ui_que:Queue, api, cam: cv2.VideoCapture, values, color, control_law: Literal["P", "PI"]="PI"):
+def _VF(
+    ui_que: Queue,
+    api,
+    cam: cv2.VideoCapture,
+    values,
+    color,
+    control_law: Literal["P", "PI"] = "PI",
+):
 
     dst_org = dst_bin = None
     COG = None
@@ -86,9 +94,7 @@ def _VF(ui_que:Queue, api, cam: cv2.VideoCapture, values, color, control_law: Li
         UpperThreshold=int(values["-UpperThreshold-"]),
         AdaptiveThreshold_type=values["-AdaptiveThreshold_type-"],
         AdaptiveThreshold_BlockSize=int(values["-AdaptiveThreshold_BlockSize-"]),
-        AdaptiveThreshold_Constant=int(
-            values["-AdaptiveThreshold_Constant-"]
-        ),
+        AdaptiveThreshold_Constant=int(values["-AdaptiveThreshold_Constant-"]),
         color=color,
     )
 
@@ -149,9 +155,7 @@ def _VF(ui_que:Queue, api, cam: cv2.VideoCapture, values, color, control_law: Li
     }
     pose = dType.GetPose(api)
     for num, key in enumerate(current_pose.keys()):
-        current_pose[key] = round(
-            pose[num], 2
-        )  # 繰り返し誤差 0.2 mm なので入力も合わせる
+        current_pose[key] = round(pose[num], 2)  # 繰り返し誤差 0.2 mm なので入力も合わせる
 
     # 計算した距離の誤差が±10以内の場合
     if (-10 <= e_x <= 10) and (-10 <= e_y <= 10):
@@ -201,9 +205,7 @@ def _VF(ui_que:Queue, api, cam: cv2.VideoCapture, values, color, control_law: Li
 
     pose = dType.GetPose(api)
     for num, key in enumerate(current_pose.keys()):
-        current_pose[key] = round(
-            pose[num], 2
-        )  # 繰り返し誤差 0.2 mm なので入力も合わせる
+        current_pose[key] = round(pose[num], 2)  # 繰り返し誤差 0.2 mm なので入力も合わせる
 
     return_param["pose"] = current_pose
     ui_que.put(return_param)
