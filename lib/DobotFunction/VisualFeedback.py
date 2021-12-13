@@ -345,15 +345,13 @@ class VisualFeedback2(Timer):
         Timer.__init__(self, interval, self.run, args, kwargs)
         self.thread = None
         self.function = function
-        # self.err = 0
-        # self.err_2 = 1
         self.data_que = Queue()  # ワーカープロセスへ送るデータ
         self.ui_que = Queue()  # ワーカーから送られてくるデータ
 
     def run(self):
         self.thread = Timer(self.interval, self.run)
         self.thread.start()
-        self.function(**{"err": self.err, "err_2": self.err_2})
+        self.function(*self.args, **self.kwargs)
 
     def cancel(self):
         if self.thread is not None:
@@ -363,6 +361,32 @@ class VisualFeedback2(Timer):
 
     def GetValue(self):
         return self.err, self.err_2
+
+
+class ThreadManager():
+    def __init__(self, callback, time_count) -> None:
+        self.tmthread = TimeManageThread(callback, time_count)
+
+    def cancelTimer(self):
+        self.tmthread.cancelTimer()
+
+class TimeManageThread(Thread):
+    def __init__(self, callback, time_count):
+        super().__init__(self)
+        self.__callback = callback
+        self.__iscancel = False
+        self.__time_count = time_count
+
+    def run(self):
+        for i in range(self.__time_count):
+            time.sleep(1)
+            if self.__iscancel:
+                self.__callback("Timer canceled！")
+                return
+        self.__callback(str(self.__time_count) + "sec counted!")
+
+    def cancelTimer(self):
+        self.__iscancel = True
 
 
 def VF(err, err_2):
@@ -422,9 +446,18 @@ if __name__ == "__main__":
         x += 1
         print(x)
 
-    i = 2
-    vf = VisualFeedback2(1, count, [i])
-    vf.start()
-    time.sleep(5)
-    err, err_2 = vf.GetValue()
-    print(err, err_2)
+    err = 1
+    err_2 = 2
+    # vf = VisualFeedback2(1, VF, {err, err_2})
+    # vf.start()
+    # time.sleep(5)
+    # err, err_2 = vf.GetValue()
+    # print(err, err_2)
+
+    def timerCallback(message):
+        print(message)
+
+    def test1():
+        print("test1 start")
+
+        t1 = ThreadManager(timerCallback, 5)
