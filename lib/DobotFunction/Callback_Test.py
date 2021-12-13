@@ -12,6 +12,7 @@ from lib.DobotFunction.Camera import SnapshotCvt, Contours
 value = 1
 value_2 = 10
 
+
 class VisualFeedback2(Timer):
     def __init__(
         self,
@@ -39,7 +40,6 @@ class VisualFeedback2(Timer):
 
     def GetValue(self):
         return self.ui_que.get_nowait()
-
 
 
 def VF(ui_que: Queue, err, err_2) -> Queue:

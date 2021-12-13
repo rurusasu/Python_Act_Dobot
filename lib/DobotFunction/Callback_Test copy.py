@@ -20,21 +20,7 @@ value = 1
 value_2 = 10
 
 
-class TimerManager:
-    def __init__(
-        self,
-        interval: float,
-        callback: Callable[..., Any],
-        args: Union[Iterable[Any], None] = [],
-        kwargs: Union[Mapping[str, Any], None] = {},
-    ) -> None:
-        self.tmthread = TimerFuction(interval, callback, args, kwargs)
-
-    def cancelTimer(self):
-        self.tmthread.cancel()
-
-
-class TimerFuction(Timer):
+class TimerFunction(Timer):
     def __init__(
         self,
         interval: float,
@@ -77,13 +63,23 @@ def _VF(
     api,
     cam: cv2.VideoCapture,
     values,
-    color,
     control_law: Literal["P", "PI"] = "PI",
 ):
+    if values["-color_R-"]:
+        color = 0
+    elif values["-color_G-"]:
+        color = 1
+    elif values["-color_B-"]:
+        color = 2
+    elif values["-color_W-"]:
+        color = 3
+    elif values["-color_Bk-"]:
+        color = 4
 
     dst_org = dst_bin = None
     COG = None
     return_param = {"dst_org": dst_org, "dst_bin": dst_bin, "pose": None, "COG": COG}
+    ui_que.put(return_param)
     # スナップショット撮影
     err, dst_org, dst_bin = SnapshotCvt(
         cam,
@@ -220,34 +216,39 @@ if __name__ == "__main__":
         Connect_Disconnect,
     )
 
-    api = dType.load()  # Dobot 制御ライブラリの読み出し
-    connection = False  # Dobotの接続状態
-    connection = Connect_Disconnect(connection, api)
-    pose = dType.GetPose(api)
+    # api = dType.load()  # Dobot 制御ライブラリの読み出し
+    # connection = False  # Dobotの接続状態
+    # connection = Connect_Disconnect(connection, api)
+    # pose = dType.GetPose(api)
 
-    if connection:
-        values = {
-            "-MoveMode-": "MoveJCoordinate",
-            "-Color_Space-": "RGB",
-            "-Color_Density-": "なし",
-            "-Binarization-": "Two",
-            "-LowerThreshold-": "103",
-            "-UpperThreshold-": "128",
-            "-AdaptiveThreshold_type-": "Mean",
-            "-AdaptiveThreshold_BlockSize-": "11",
-            "-AdaptiveThreshold_Constant-": "2",
-            "-CalcCOGMode-": "輪郭から重心を計算",
-            "-RetrievalMode-": "2つの階層に分類する",
-            "-ApproximateMode-": "中間点を保持する",
-            "-color_R-": False,
-            "-color_G-": False,
-            "-color_B-": True,
-            "-color_W-": False,
-            "-color_Bk-": False,
-            "-Kp-": 0.05,
-            "-Ki-": 0.01,
-        }
-        device_num = 1
-        cam = cv2.VideoCapture(device_num, cv2.CAP_DSHOW)
+    values = {
+        "-MoveMode-": "MoveJCoordinate",
+        "-Color_Space-": "RGB",
+        "-Color_Density-": "なし",
+        "-Binarization-": "Two",
+        "-LowerThreshold-": "103",
+        "-UpperThreshold-": "128",
+        "-AdaptiveThreshold_type-": "Mean",
+        "-AdaptiveThreshold_BlockSize-": "11",
+        "-AdaptiveThreshold_Constant-": "2",
+        "-CalcCOGMode-": "輪郭から重心を計算",
+        "-RetrievalMode-": "2つの階層に分類する",
+        "-ApproximateMode-": "中間点を保持する",
+        "-color_R-": False,
+        "-color_G-": False,
+        "-color_B-": True,
+        "-color_W-": False,
+        "-color_Bk-": False,
+        "-Kp-": 0.05,
+        "-Ki-": 0.01,
+    }
+    api = 0  # dummy
+    device_num = 1
+    cam = cv2.VideoCapture(device_num, cv2.CAP_DSHOW)
 
-        vf = TimerManager(1, _VF, {api, cam, values})
+    vf = TimerFunction(1, _VF, [api, cam, values])
+
+    time.sleep(10)
+
+    value = vf.GetValue()
+    print(value)
