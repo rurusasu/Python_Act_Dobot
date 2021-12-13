@@ -18,6 +18,8 @@ def WebCam_Visualization(cam: cv2.VideoCapture):
 
     while True:
         ret, frame = cam.read()
+        if frame == None:
+            break
         cv2.imshow("frame", frame)
         if cv2.waitKey(1) & 0xFF == ord("q"):
             break
@@ -27,7 +29,9 @@ def WebCam_Visualization(cam: cv2.VideoCapture):
 
 
 if __name__ == "__main__":
-    device_num = 1
-    cam = cv2.VideoCapture(device_num, cv2.CAP_DSHOW)
+    print(cv2.getBuildInformation())
 
-    WebCam_Visualization(cam)
+    # device_num = 0
+    # cam = cv2.VideoCapture(device_num)
+
+    # WebCam_Visualization(cam)

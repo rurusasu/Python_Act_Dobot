@@ -54,46 +54,6 @@ def VF(ui_que: Queue, err, err_2) -> Queue:
 if __name__ == "__main__":
     import time
 
-    """
-    from lib.DobotDLL import DobotDllType as dType
-    from lib.DobotFunction.Communication import (
-        Connect_Disconnect,
-    )
-
-    api = dType.load()  # Dobot 制御ライブラリの読み出し
-    connection = False  # Dobotの接続状態
-    connection = Connect_Disconnect(connection, api)
-    pose = dType.GetPose(api)
-
-    if connection:
-        values = {
-            "-MoveMode-": "MoveJCoordinate",
-            "-Color_Space-": "RGB",
-            "-Color_Density-": "なし",
-            "-Binarization-": "Two",
-            "-LowerThreshold-": "103",
-            "-UpperThreshold-": "128",
-            "-AdaptiveThreshold_type-": "Mean",
-            "-AdaptiveThreshold_BlockSize-": "11",
-            "-AdaptiveThreshold_Constant-": "2",
-            "-CalcCOGMode-": "輪郭から重心を計算",
-            "-RetrievalMode-": "2つの階層に分類する",
-            "-ApproximateMode-": "中間点を保持する",
-            "-color_R-": False,
-            "-color_G-": False,
-            "-color_B-": True,
-            "-color_W-": False,
-            "-color_Bk-": False,
-            "-Kp-": 0.05,
-            "-Ki-": 0.01,
-        }
-        device_num = 1
-        cam = cv2.VideoCapture(device_num, cv2.CAP_DSHOW)
-
-        # vf = VisualFeedback(api, cam, values)
-        # vf.run(target="vf")
-    """
-
     err = 1
     err_2 = 2
     vf = VisualFeedback2(1, VF, {err, err_2})

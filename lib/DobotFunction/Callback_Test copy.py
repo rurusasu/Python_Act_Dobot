@@ -24,26 +24,26 @@ class TimerFunction(Timer):
     def __init__(
         self,
         interval: float,
-        callback: Callable[..., Any],
+        function: Callable[..., Any],
         args: Union[Iterable[Any], None] = [],
         kwargs: Union[Mapping[str, Any], None] = {},
     ) -> None:
         Timer.__init__(self, interval, self.run, args, kwargs)
-        self.__thread = None
-        self.__callback = callback
+        self.thread = None
+        self.function = function
         # self.data_que = Queue()  # ワーカープロセスへ送るデータ
         self.ui_que = Queue()  # ワーカーから送られてくるデータ
 
     def run(self):
-        self.__thread = Timer(self.interval, self.run)
-        self.__thread.start()
-        self.__callback(self.ui_que, *self.args, **self.kwargs)
+        self.thread = Timer(self.interval, self.run)
+        self.thread.start()
+        self.function(self.ui_que, *self.args, **self.kwargs)
 
     def cancel(self):
-        if self.__thread is not None:
-            self.__thread.cancel()
-            self.__thread.join()
-            del self.__thread
+        if self.thread is not None:
+            self.thread.cancel()
+            self.thread.join()
+            del self.thread
 
     def GetValue(self):
         return self.ui_que.get_nowait()
@@ -102,7 +102,9 @@ def _VF(
     else:
         return_param["dst_org"] = dst_org
         return_param["dst_bin"] = dst_bin
+        ui_que.put(return_param)
 
+    """
     # 重心位置計算
     COG, dst_org = Contours(
         rgb_img=dst_org,
@@ -206,6 +208,7 @@ def _VF(
     return_param["pose"] = current_pose
     ui_que.put(return_param)
     return
+    """
 
 
 if __name__ == "__main__":
@@ -243,12 +246,17 @@ if __name__ == "__main__":
         "-Ki-": 0.01,
     }
     api = 0  # dummy
-    device_num = 1
+    device_num = 0
     cam = cv2.VideoCapture(device_num, cv2.CAP_DSHOW)
+
+    # err = 1
+    # err_2 = 2
+    # vf = TimerFunction(1, Test, {err ,err_2})
 
     vf = TimerFunction(1, _VF, [api, cam, values])
 
-    time.sleep(10)
+    vf.start()
+    time.sleep(3)
 
     value = vf.GetValue()
     print(value)
