@@ -437,27 +437,3 @@ if __name__ == "__main__":
 
         # vf = VisualFeedback(api, cam, values)
         # vf.run(target="vf")
-    """
-
-    def hello():
-        print("hello")
-
-    def count(x: int):
-        x += 1
-        print(x)
-
-    err = 1
-    err_2 = 2
-    # vf = VisualFeedback2(1, VF, {err, err_2})
-    # vf.start()
-    # time.sleep(5)
-    # err, err_2 = vf.GetValue()
-    # print(err, err_2)
-
-    def timerCallback(message):
-        print(message)
-
-    def test1():
-        print("test1 start")
-
-        t1 = ThreadManager(timerCallback, 5)

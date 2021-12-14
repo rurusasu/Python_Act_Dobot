@@ -1,4 +1,7 @@
-import sys, os
+import os
+import sys
+
+from typing import Literal
 
 sys.path.append(".")
 sys.path.append("..")
@@ -8,43 +11,39 @@ import cv2
 import numpy as np
 
 
-def Contrast_cvt(src, cvt_type):
+def Contrast_cvt(src: np.ndarray, Color_Density: Literal["None", "Linear", "Non-Linear", "Histogram-Flatten"] = "None",) -> np.ndarray:
     """
     濃度の変換方法を選択する関数
 
-    Parameter
-    ---------
-    src : OpenCV型
-        変換前の画像
-    cvt_type : string
-        濃度の変換方法
-        ・線形濃度変換
-        ・非線形濃度変換
-        ・ヒストグラム平坦化
+    Args:
+        src (np.ndarray): 変換前の画像.
+        Color_Density (Literal[, optional): 画像の濃度変換.
+            ["None", "Linear", "Non-Linear", "Histogram-Flatten"]．
+            Defaults to "None".
 
-    Return
-    ------
-    dst : OpenCV型
-        変換後の画像
+    Return:
+    dst (np.ndarray): 変換後の画像
     """
     a = 0.7
     gamma = 0.5
 
-    new_img = src.copy()
+    # new_img = src.copy()
 
-    if cvt_type == "線形濃度変換":  # 線形濃度変換を行う
-        new_img = _LUT_curve(__curve_1, a, new_img)
-    elif cvt_type == "非線形濃度変換":  # ガンマ補正を行う
-        new_img = _LUT_curve(__curve_5, gamma, new_img)
-    elif cvt_type == "ヒストグラム平坦化":  # ヒストグラム平坦化を行う
-        if len(new_img.shape) == 2:
+    if Color_Density == "Linear":  # 線形濃度変換を行う
+        dst = _LUT_curve(__curve_1, a, src)
+    elif Color_Density == "Non-Linear":  # ガンマ補正を行う
+        dst = _LUT_curve(__curve_5, gamma, src)
+    elif Color_Density == "Histogram-Flatten":  # ヒストグラム平坦化を行う
+        if len(src.shape) == 2:
             # if color_type == 'glay':  # グレー画像について変換
-            new_img = _GlayHist(new_img)
-        elif len(new_img.shape) == 3:
+            dst = _GlayHist(src)
+        elif len(src.shape) == 3:
             # elif color_type == 'RGB':  # rgb画像について変換
-            new_img = _RGBHist(new_img)
-            new_img = cv2.cvtColor(new_img, cv2.COLOR_BGR2RGB)
-    return new_img
+            dst = _RGBHist(src)
+            dst = cv2.cvtColor(dst, cv2.COLOR_BGR2RGB)
+    else:
+        pass
+    return dst
 
 
 def _LUT_curve(f, a: float, rgb_img: np.ndarray) -> np.ndarray:
@@ -69,7 +68,7 @@ def _LUT_curve(f, a: float, rgb_img: np.ndarray) -> np.ndarray:
     return dst
 
 
-def __curve_1(a, x):
+def __curve_1(a: float, x: np.uint8):
     y = a * x
     return y
 

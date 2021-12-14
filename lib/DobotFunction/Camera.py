@@ -169,26 +169,6 @@ def Snapshot(cam: cv2.VideoCapture) -> np.ndarray:
         return 4, None
 
 
-def scale_box(src: np.ndarray, width: int, height: int):
-    """
-    アスペクト比を固定して、指定した大きさに収まるようリサイズする。
-
-    Args:
-        src (np.ndarray):
-            入力画像
-        width (int):
-            サイズ変更後の画像幅
-        height (int):
-            サイズ変更後の画像高さ
-
-    Return:
-        dst (np.ndarray):
-            サイズ変更後の画像
-    """
-    scale = max(width / src.shape[1], height / src.shape[0])
-    return cv2.resize(src, dsize=None, fx=scale, fy=scale)
-
-
 def Preview(img: np.ndarray = None, window_name: str = "frame", preview: str = "cv2"):
     """
     webカメラの画像を表示する関数
@@ -268,106 +248,205 @@ def Color_cvt(src: np.ndarray, color_type: str):
 def ImageCvt(
     img: np.ndarray,
     Color_Space: Literal["RGB", "Gray"] = "RGB",
-    Color_Density: Literal["なし", "線形濃度変換", "ヒストグラム平坦化"] = "なし",
-    Binarization: Literal["なし", "Global", "Otsu", "Adaptive", "Two"] = "なし",
+    Color_Density: Literal["None", "Linear", "Non-Linear", "Histogram-Flatten"] = "None",
+    Binarization: Literal["None", "Global", "Otsu", "Adaptive", "Two"] = "None",
     LowerThreshold: int = 10,
     UpperThreshold: int = 150,
     AdaptiveThreshold_type: Literal["Mean", "Gaussian", "Wellner"] = "Mean",
     AdaptiveThreshold_BlockSize: int = 11,
     AdaptiveThreshold_Constant: int = 2,
     color: int = 4,
-) -> Tuple[int, np.ndarray, np.ndarray]:
+    background_color: Literal[0, 1] = 0
+) -> Tuple[int, np.ndarray, np.ndarray, Union[None, float], Union[None, float]]:
+    """
+    入力画像に対して指定の処理を施す関数．
+
+    Args:
+        img (np.ndarray): 変換前の画像データ．
+        Color_Space (Literal["RGB", "Gray"], optional):
+            画像の階調．Defaults to "RGB".
+        Color_Density (Literal["None", "Linear", "Non-Linear", "Histogram-Flatten"], optional):
+            画像の濃度変換.
+            Defaults to "None".
+        Binarization (Literal["None", "Global", "Otsu", "Adaptive", "Two"], optional):
+            画像の二値化.
+            Defaults to "None".
+        LowerThreshold (int, optional): [description]. Defaults to 10.
+        UpperThreshold (int, optional): [description]. Defaults to 150.
+        AdaptiveThreshold_type (Literal["Mean", "Gaussian", "Wellner"], optional):
+            小領域中での閾値の計算方法．Defaults to "Mean".
+            * Mean: 近傍領域の中央値を閾値とする。
+            * Gaussian: 近傍領域の重み付け平均値を閾値とする。
+                        重みの値はGaussian分布になるように計算。
+            * Wellner:
+        AdaptiveThreshold_BlockSize (int, optional):
+            閾値計算に使用する近傍領域のサイズ．ただし1より大きい奇数．Defaults to 11.
+        AdaptiveThreshold_Constant (int, optional): [description]. Defaults to 2.
+        color (int, optional): 計算された閾値から引く定数．Defaults to 4.
+        background_color (Literal[0, 1], optional): 背景の色．Defaults to 0.
+            * 0: 背景が黒．
+            * 1: 背景が白．
+
+    Returns:
+        Tuple[int, np.ndarray, np.ndarray]: 返り値．
+            * err (int): エラーフラグ．4: 撮影エラー, 5: 画像処理成功
+            * dst_org (np.ndarray): 撮影されたオリジナル画像．
+            * dst_bin (np.ndarray): 画像処理された画像．
+            * l_th (None|float): 下側の閾値．二値化処理を使用しなかった場合はNone．
+            * u_th (None|float): 上側の閾値．2つの二値化処理以外を指定した場合はNone．
+    """
+    l_th = u_th = None
     dst = img.copy()
 
-    # ---------------------------
-    # 撮影した画像を変換する。
-    # ---------------------------
+    # ------------------ #
+    # 撮影した画像を変換する #
+    # ------------------ #
     # 色空間変換
     if Color_Space != "RGB":
         dst = Color_cvt(dst, Color_Space)
     # 濃度変換
-    if Color_Density != "なし":
+    if Color_Density != "None":
         dst = Contrast_cvt(dst, Color_Density)
     # 二値化処理
-    if Binarization == "なし":
+    if Binarization == "None":
         return 5, img, dst
     else:
-        if Binarization == "Global":  # 大域的二値化処理
+        # 大域的二値化処理
+        if Binarization == "Global":
             if Color_Space == "RGB":
                 r, g, b = cv2.split(img)
                 if color == 0:  # Red
-                    dst = GlobalThreshold(r, threshold=LowerThreshold)
-                    dst = cv2.bitwise_not(dst)
+                    l_th, dst = GlobalThreshold(r, threshold=LowerThreshold)
                 elif color == 1:  # Green
-                    dst = GlobalThreshold(g, threshold=LowerThreshold)
+                    l_th, dst = GlobalThreshold(g, threshold=LowerThreshold)
                 elif color == 2:
-                    dst = GlobalThreshold(b, threshold=LowerThreshold)
+                    l_th, dst = GlobalThreshold(b, threshold=LowerThreshold)
+                else:
+                    pass
             else:
-                dst = GlobalThreshold(dst, threshold=LowerThreshold)
-        elif Binarization == "Otsu":  # 大津の二値化処理
-            dst = GlobalThreshold(dst, Type="Otsu")
+                l_th, dst = GlobalThreshold(dst, threshold=LowerThreshold)
+        # 大津の二値化処理
+        elif Binarization == "Otsu":
+            if Color_Space == "RGB":
+                r, g, b = cv2.split(img)
+                if color == 0:
+                    l_th, dst = GlobalThreshold(r, Type="Otsu")
+                elif color == 1:
+                    l_th, dst = GlobalThreshold(g, Type="Otsu")
+                elif color == 2:
+                    l_th, dst = GlobalThreshold(b, Type="Otsu")
+                else:
+                    pass
+            else:
+                l_th, dst = GlobalThreshold(dst, Type="Otsu")
+        # 適応的二値化処理
         elif Binarization == "Adaptive":
-            dst = AdaptiveThreshold(
-                img=dst,
-                method=str(AdaptiveThreshold_type),
-                block_size=AdaptiveThreshold_BlockSize,
-                C=AdaptiveThreshold_Constant,
-            )
-        elif Binarization == "Two":  # 2つの閾値を用いた二値化処理
-            # ピックアップする色を番号に変換
-
+            if Color_Space == "RGB":
+                r, g, b = cv2.split(img)
+                if color == 0:
+                    dst = AdaptiveThreshold(
+                        img=r,
+                        method=str(AdaptiveThreshold_type),
+                        block_size=AdaptiveThreshold_BlockSize,
+                        C=AdaptiveThreshold_Constant,
+                    )
+                elif color == 1:
+                    dst = AdaptiveThreshold(
+                        img=g,
+                        method=str(AdaptiveThreshold_type),
+                        block_size=AdaptiveThreshold_BlockSize,
+                        C=AdaptiveThreshold_Constant,
+                    )
+                elif color == 2:
+                    dst = AdaptiveThreshold(
+                        img=b,
+                        method=str(AdaptiveThreshold_type),
+                        block_size=AdaptiveThreshold_BlockSize,
+                        C=AdaptiveThreshold_Constant,
+                    )
+                else:
+                    pass
+            else:
+                dst = AdaptiveThreshold(
+                    img=dst,
+                    method=str(AdaptiveThreshold_type),
+                    block_size=AdaptiveThreshold_BlockSize,
+                    C=AdaptiveThreshold_Constant,
+                )
+        # 2つの閾値を用いた二値化処理
+        elif Binarization == "Two" and color != 5:
             dst = TwoThreshold(
                 img=dst,
                 LowerThreshold=LowerThreshold,
                 UpperThreshold=UpperThreshold,
                 PickupColor=color,
             )
+            l_th = LowerThreshold
+            u_th = UpperThreshold
 
-    return 5, img, dst
+        if background_color == 1:
+            dst = cv2.bitwise_not(dst)
+    return 5, dst, l_th, u_th
 
 
 def SnapshotCvt(
     cam: cv2.VideoCapture,
     Color_Space: Literal["RGB", "Gray"] = "RGB",
-    Color_Density: Literal["なし", "線形濃度変換", "非線形濃度変換", "ヒストグラム平坦化"] = "なし",
-    Binarization: Literal["なし", "Global", "Otsu", "Adaptive", "Two"] = "なし",
+    Color_Density: Literal["None", "Linear", "Non-Linear", "Histogram-Flatten"] = "None",
+    Binarization: Literal["None", "Global", "Otsu", "Adaptive", "Two"] = "None",
     LowerThreshold: int = 10,
     UpperThreshold: int = 150,
     AdaptiveThreshold_type: Literal["Mean", "Gaussian", "Wellner"] = "Mean",
     AdaptiveThreshold_BlockSize: int = 11,
     AdaptiveThreshold_Constant: int = 2,
     color: int = 4,
-) -> Tuple[int, np.ndarray, np.ndarray]:
+    background_color: Literal[0, 1] = 0
+) -> Tuple[int, np.ndarray, np.ndarray, Union[None, float], Union[None, float]]:
     """
     スナップショットを撮影し，二値化処理を行う関数．
 
     Args:
-        cam (cv2.VideoCapture): 接続しているカメラ情報
-        Color_Space (Literal[, optional): 画像の階調．["RGB", "Gray"]． Defaults to "RGB".
-        Color_Density (Literal[, optional): 画像の濃度変換.
-        * ["線形濃度変換", "非線形濃度変換", "ヒストグラム平坦化"]．
-        * Defaults to "なし".
-        Binarization (Literal[, optional): 画像の二値化. Defaults to "なし".
+        cam (cv2.VideoCapture):
+            接続しているカメラ情報．
+        Color_Space (Literal["RGB", "Gray"], optional):
+            画像の階調．Defaults to "RGB".
+        Color_Density (Literal["None", "Linear", "Non-Linear", "Histogram-Flatten"], optional):
+            画像の濃度変換.
+            Defaults to "None".
+        Binarization (Literal["None", "Global", "Otsu", "Adaptive", "Two"], optional):
+            画像の二値化.
+            Defaults to "None".
         LowerThreshold (int, optional): [description]. Defaults to 10.
         UpperThreshold (int, optional): [description]. Defaults to 150.
-        AdaptiveThreshold_type (Literal[, optional): [description]. Defaults to "Mean".
-        AdaptiveThreshold_BlockSize (int, optional): [description]. Defaults to 11.
+        AdaptiveThreshold_type (Literal["Mean", "Gaussian", "Wellner"], optional):
+            小領域中での閾値の計算方法．Defaults to "Mean".
+            * Mean: 近傍領域の中央値を閾値とする．
+            * Gaussian: 近傍領域の重み付け平均値を閾値とする．
+                        重みの値はGaussian分布になるように計算．
+            * Wellner:
+        AdaptiveThreshold_BlockSize (int, optional):
+            閾値計算に使用する近傍領域のサイズ．ただし1より大きい奇数．Defaults to 11.
         AdaptiveThreshold_Constant (int, optional): [description]. Defaults to 2.
-        color (int, optional): [description]. Defaults to 4.
+        color (int, optional): 計算された閾値から引く定数．Defaults to 4.
+        background_color (Literal[0, 1], optional): 背景の色．Defaults to 0.
+            * 0: 背景が黒．
+            * 1: 背景が白．
 
     Returns:
-        Tuple[int, np.ndarray, np.ndarray]: 返り値
-        * err (int): エラーフラグ．4: 撮影エラー, 5: 画像処理成功
-        * dst_org (np.ndarray): 撮影されたオリジナル画像
-        * dst_bin (np.ndarray): 画像処理された画像
+        Tuple[int, np.ndarray, np.ndarray]: 返り値．
+            * err (int): エラーフラグ．4: 撮影エラー, 5: 画像処理成功
+            * dst_org (np.ndarray): 撮影されたオリジナル画像．
+            * dst_bin (np.ndarray): 画像処理された画像．
+            * l_th (None|float): 下側の閾値．二値化処理を使用しなかった場合はNone．
+            * u_th (None|float): 上側の閾値．2つの二値化処理以外を指定した場合はNone．
     """
-    dst_org = dst_bin = None
+    l_th = u_th = None
     err, dst_org = Snapshot(cam)
 
     if err != 3:
         return 4, [], []  # WebCam_NotGetImage
 
-    err, _, dst_bin = ImageCvt(
+    err, dst_bin, l_th, u_th = ImageCvt(
         dst_org,
         Color_Space=Color_Space,
         Color_Density=Color_Density,
@@ -378,17 +457,18 @@ def SnapshotCvt(
         AdaptiveThreshold_BlockSize=AdaptiveThreshold_BlockSize,
         AdaptiveThreshold_Constant=AdaptiveThreshold_Constant,
         color=color,
+        background_color=background_color
     )
 
-    return err, dst_org, dst_bin
+    return err, dst_org, dst_bin, l_th, u_th
 
 
 def Contours(
     rgb_img: np.ndarray,
     bin_img: np.ndarray,
-    CalcCOG: Literal["画像から重心を計算", "輪郭から重心を計算"],
-    Retrieval: Literal["親子関係を無視する", "最外の輪郭を検出する", "2つの階層に分類する", "全階層情報を保持する"],
-    Approximate: Literal["中間点を保持する", "中間点を保持しない"],
+    CalcCOG: Literal["image", "outline"] = "image",
+    Retrieval: Literal["LIST", "EXTERNAL", "CCOMP", "TREE"] = "TREE",
+    Approximate: Literal["Keep", "Not-Keep"] ="Keep",
     orientation: bool = False,
     drawing_figure: bool = True,
 ) -> Tuple[Union[List[float], None], np.ndarray]:
@@ -397,32 +477,42 @@ def Contours(
     Args:
         rgb_img (np.ndarray): 計算された重心位置を重ねて表示するRGB画像
         bin_img (np.ndarray): 重心計算対象の二値画像．
-        CalcCOG (Literal["画像から重心を計算", "輪郭から重心を計算"]): 重心位置の計算対象を指定．
-        Retrieval (Literal["親子関係を無視する", "最外の輪郭を検出する", "2つの階層に分類する", "全階層情報を保持する"]): 2値画像の画素値が 255 の部分と 0 の部分を分離した際に，その親子関係を保持するか指定．
-        Approximate (Literal["中間点を保持する", "中間点を保持しない"]): 輪郭の中間点を保持するか指定．
-        orientation (bool, optional): オブジェクトの輪郭情報に基づいて姿勢を推定する関数．
-        `cal_Method = 1` の場合のみ適用可能．Default to False.
+        CalcCOG (Literal["image", "outline"], optional):
+            重心位置の計算対象を指定．Default to "image".
+        Retrieval (Literal["LIST", "EXTERNAL", "CCOMP", "TREE"], optional):
+            2値画像の画素値が 255 の部分と 0 の部分を分離した際に，その親子関係を保持するか指定．
+            Default to "TREE".
+            * "LIST": 親子関係を無視する
+            * "EXTERNAL": 最外の輪郭を検出する
+            * "CCOMP": 2つの階層に分類する
+            * "TREE": 全階層情報を保持する
+        Approximate (Literal["Keep", "Not-Keep"], optional):
+            輪郭の中間点を保持するか指定．Default to "Keep".
+        orientation (bool, optional):
+            オブジェクトの輪郭情報に基づいて姿勢を推定する関数．
+            `CalcCOG = "outline"` の場合のみ適用可能．Default to False.
         drawing_figure (bool, optional): 図を描画する．Default to True.
     Returns:
-        COG(List[float]): COG=[x, y, angle], オブジェクトの重心座標と，そのオブジェクトの2D平面での回転角度．
-        rgb_img (np.ndarray): [W, H, C] の rgb画像．
+        COG (List[float]): COG=[x, y, angle]
+            オブジェクトの重心座標と，そのオブジェクトの2D平面での回転角度．
+        rgb_img (np.ndarray): [W, H, C] の rgb 画像．
     """
     COG = None
     CalcCOGMode = {
-        "画像から重心を計算": 0,
-        "輪郭から重心を計算": 1,
+        "image": 0,
+        "outline": 1,
     }
     # 輪郭情報
     RetrievalMode = {
-        "親子関係を無視する": cv2.RETR_LIST,
-        "最外の輪郭を検出する": cv2.RETR_EXTERNAL,
-        "2つの階層に分類する": cv2.RETR_CCOMP,
-        "全階層情報を保持する": cv2.RETR_TREE,
+        "LIST": cv2.RETR_LIST,
+        "EXTERNAL": cv2.RETR_EXTERNAL,
+        "CCOMP": cv2.RETR_CCOMP,
+        "TREE": cv2.RETR_TREE,
     }
     # 輪郭の中間点情報
     ApproximateMode = {
-        "中間点を保持する": cv2.CHAIN_APPROX_NONE,
-        "中間点を保持しない": cv2.CHAIN_APPROX_SIMPLE,
+        "Keep": cv2.CHAIN_APPROX_NONE,
+        "Not-Keep": cv2.CHAIN_APPROX_SIMPLE,
     }
 
     if type(bin_img) != np.ndarray:

@@ -1,6 +1,6 @@
 import os
 import sys
-from typing import Literal
+from typing import Literal, Tuple
 
 sys.path.append(".")
 sys.path.append("..")
@@ -16,8 +16,7 @@ def GlobalThreshold(
     img: np.ndarray,
     threshold: int = 127,
     Type: Literal["cv2", "Otsu"] = "cv2",
-    color: int = 4,
-) -> np.ndarray:
+) -> Tuple[float, np.ndarray]:
     """
     画素値が閾値より大きければある値(白色'255')を割り当て，そうでなければ別の値(黒色)を割り当てる。
     入力が None なら None を、変換に成功すれば閾値処理された2値画像を返す。
@@ -35,8 +34,8 @@ def GlobalThreshold(
             Default to "cv2"
 
     Returns:
-        dst (np.ndarray):
-            変換後の画像データ(Errorが発生した場合: None)
+        th (float): 閾値
+        dst (np.ndarray): 変換後の画像データ(Errorが発生した場合: None)
     """
     if type(img) is not np.ndarray:  # 入力データがndarray型でない場合
         raise ValueError("入力型が異なります。")
@@ -46,8 +45,9 @@ def GlobalThreshold(
     try:
         if Type == "cv2":
             _, dst = cv2.threshold(img, threshold, 255, cv2.THRESH_BINARY)
+            th = threshold
         elif Type == "Otsu":
-            dst = _OtsuThreshold(img)
+            th, dst = _OtsuThreshold(img)
         else:
             raise Exception("選択した処理方法が存在しません．")
     except Exception as e:
@@ -55,10 +55,11 @@ def GlobalThreshold(
         return None
     else:
         dst = np.array(dst)  # ndarray型に変換
-        return dst
+        # dst = cv2.bitwise_not(dst)
+        return th, dst
 
 
-def _OtsuThreshold(img: np.ndarray, min_value: int = 0, max_value: int = 255):
+def _OtsuThreshold(img: np.ndarray, min_value: int = 0, max_value: int = 255) -> Tuple[float, np.ndarray]:
     """
     入力画像が bimodal image (ヒストグラムが双峰性を持つような画像)であることを仮定すると、
     そのような画像に対して、二つのピークの間の値を閾値として選べば良いと考えることであろう。これが大津の二値化の手法である。
@@ -75,6 +76,7 @@ def _OtsuThreshold(img: np.ndarray, min_value: int = 0, max_value: int = 255):
             default: 255
 
     Returns:
+        t (float): 閾値
         img (np.ndarray):
             変換後の画像データ
     """
@@ -111,11 +113,14 @@ def _OtsuThreshold(img: np.ndarray, min_value: int = 0, max_value: int = 255):
     img[img < t] = min_value
     img[img >= t] = max_value
 
-    return img
+    return t, img
 
 
 def AdaptiveThreshold(
-    img: np.ndarray, method: str = "Mean", block_size: int = 11, C: int = 2
+    img: np.ndarray,
+    method: Literal["Mean", "Gaussian", "Wellner"] = "Mean",
+    block_size: int = 11,
+    C: int = 2
 ):
     """
     適応的閾値処理では，画像の小領域ごとに閾値の値を計算する．
@@ -123,15 +128,16 @@ def AdaptiveThreshold(
     img is NoneならNoneを、変換に成功すれば閾値処理された2値画像を返す。
 
     Args:
-        img (np.ndarray): 変換前の画像データ
-        method (str optional): 小領域中での閾値の計算方法
-            * Mean: 近傍領域の中央値を閾値とする。
-            * Gaussian: 近傍領域の重み付け平均値を閾値とする。
-                              重みの値はGaussian分布になるように計算。
+        img (np.ndarray): 変換前の画像データ．
+        method (Literal["Mean", "Gaussian", "Wellner"], optional):
+            小領域中での閾値の計算方法．
+            * Mean: 近傍領域の中央値を閾値とする．
+            * Gaussian: 近傍領域の重み付け平均値を閾値とする．
+                        重みの値はGaussian分布になるように計算．
             * Wellner:
-        block_size (int optional): 閾値計算に使用する近傍領域のサイズ。
-            ただし1より大きい奇数でなければならない。
-        C (int optional): 計算された閾値から引く定数。
+        block_size (int optional): 閾値計算に使用する近傍領域のサイズ．
+            ただし1より大きい奇数でなければならない．
+        C (int optional): 計算された閾値から引く定数．
     Return:
         dst (np.ndarray): 変換後の画像
     """

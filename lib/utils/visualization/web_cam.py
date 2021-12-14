@@ -29,9 +29,7 @@ def WebCam_Visualization(cam: cv2.VideoCapture):
 
 
 if __name__ == "__main__":
-    print(cv2.getBuildInformation())
+    device_num = 0
+    cam = cv2.VideoCapture(device_num)
 
-    # device_num = 0
-    # cam = cv2.VideoCapture(device_num)
-
-    # WebCam_Visualization(cam)
+    WebCam_Visualization(cam)

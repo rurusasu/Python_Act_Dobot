@@ -2,6 +2,9 @@ import os
 import json
 from typing import Dict
 
+import cv2
+import numpy as np
+
 
 def ReadJsonToDict(r_json_pth: str) -> Dict:
     """
@@ -25,6 +28,26 @@ def ReadJsonToDict(r_json_pth: str) -> Dict:
         data = json.load(f)
 
     return data
+
+
+def scale_box(src: np.ndarray, width: int, height: int):
+    """
+    アスペクト比を固定して、指定した大きさに収まるようリサイズする。
+
+    Args:
+        src (np.ndarray):
+            入力画像
+        width (int):
+            サイズ変更後の画像幅
+        height (int):
+            サイズ変更後の画像高さ
+
+    Return:
+        dst (np.ndarray):
+            サイズ変更後の画像
+    """
+    scale = max(width / src.shape[1], height / src.shape[0])
+    return cv2.resize(src, dsize=None, fx=scale, fy=scale)
 
 
 def WriteDataToJson(data: Dict, wt_json_pth: str):
