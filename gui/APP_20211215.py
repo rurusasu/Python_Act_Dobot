@@ -2187,11 +2187,11 @@ class Dobot_APP:
         src = img.copy()
         src = scale_box(src, self.Image_width, self.Image_height)
 
-        if type(hist_img) is None:
-            metrix = src
-        else:
+        if type(hist_img) is np.ndarray:
             metrix = hist_img.copy()
             metrix = scale_box(metrix, self.Image_width, self.Image_height)
+        else:
+            metrix = src
 
         if isinstance(threshold, tuple):
             threshold = [th for th in threshold if th != None]

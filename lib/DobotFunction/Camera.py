@@ -511,10 +511,10 @@ def Contours(
         COG, rgb_img = CenterOfGravity(
             rgb_img=rgb_img,
             bin_img=bin_img,
-            Retrieval=RetrievalMode[Retrieval],
-            Approximate=ApproximateMode[Approximate],
+            Retrieval=Retrieval,
+            Approximate=Approximate,
             min_area=100,
-            cal_Method=CalcCOGMode[CalcCOG],
+            cal_Method=CalcCOG,
             orientation=orientation,
             drawing_figure=drawing_figure,
         )

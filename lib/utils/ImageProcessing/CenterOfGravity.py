@@ -35,7 +35,7 @@ def CenterOfGravity(
     min_area=100,
     cal_Method: Literal["image", "outline"] = "image",
     orientation: bool = False,
-    drawing_figure: bool = True,
+    drawing_figure: bool = False,
 ) -> Tuple[Union[List[float], None], np.ndarray]:
     """
     オブジェクトの図心を計算する関数
@@ -78,13 +78,15 @@ def CenterOfGravity(
         Approximate = ApproximateMode[Approximate]
     else:
         raise ValueError("The `Approximate` is invalid.")
+    if cal_Method in CalcCOGMode:
+        cal_Method = CalcCOGMode[cal_Method]
+    else:
+        raise ValueError("The `cal_Method` is invalid.")
 
     # 入力が2値画像以外の場合
     if (type(bin_img) is not np.ndarray) or (len(bin_img.shape) != 2):
         raise ValueError("入力画像が不正です！")
 
-    # dst_rgb = rgb_img.copy()
-    # dst_bin = bin_img.copy()
     # 画像をもとに重心を求める場合
     if cal_Method == 0:
         M = cv2.moments(bin_img, False)
@@ -93,8 +95,8 @@ def CenterOfGravity(
     else:
         contours = _ExtractContours(
             bin_img=bin_img,
-            RetrievalMode=RetrievalMode,
-            ApproximateMode=ApproximateMode,
+            Retrieval=Retrieval,
+            Approximate=Approximate,
             min_area=min_area,
         )
 
@@ -151,8 +153,8 @@ def CenterOfGravity(
 
 def _ExtractContours(
     bin_img,
-    RetrievalMode=cv2.RETR_EXTERNAL,
-    ApproximateMode=cv2.CHAIN_APPROX_NONE,
+    Retrieval=cv2.RETR_EXTERNAL,
+    Approximate=cv2.CHAIN_APPROX_NONE,
     min_area=100,
 ) -> np.ndarray:
     """
@@ -161,12 +163,12 @@ def _ExtractContours(
 
     Args:
         bin_img (np.ndarray): 二値画像
-        RetrievalMode (optional): 輪郭の階層情報
+        Retrieval (optional): 輪郭の階層情報
             * cv2.RETR_LIST: 輪郭の親子関係を無視する(親子関係が同等に扱われるので、単なる輪郭として解釈される)。
             * cv2.RETR_EXTERNAL: 最も外側の輪郭だけを検出するモード
             * cv2.RETR_CCOMP: 2レベルの階層に分類する(物体の外側の輪郭を階層1、物体内側の穴などの輪郭を階層2として分類)。
             * cv2.RETR_TREE: 全階層情報を保持する。
-        ApproximateMode (optional): 輪郭の近似方法
+        Approximate (optional): 輪郭の近似方法
             * cv2.CHAIN_APPROX_NONE: 中間点も保持する。
             * cv2.CHAIN_APPROX_SIMPLE: 中間点は保持しない。
         min_area (int): 領域が占める面積の閾値を指定
@@ -176,7 +178,7 @@ def _ExtractContours(
     """
     # 輪郭検出（Detection contours）
     # contours: 輪郭線の画素位置の numpy 配列
-    contours, hierarchy = cv2.findContours(bin_img, RetrievalMode, ApproximateMode)
+    contours, hierarchy = cv2.findContours(bin_img, Retrieval, Approximate)
     # 小さい輪郭は誤検出として削除する
     contours = list(filter(lambda x: cv2.contourArea(x) > min_area, contours))
     # 輪郭近似（Contour approximation）
@@ -185,14 +187,14 @@ def _ExtractContours(
     return approx
 
 
-def __approx_contour(contours: list):
+def __approx_contour(contours: List[int]) -> List[int]:
     """
     輪郭線の直線近似を行う関数
 
     Arg:
-        contours (list[int]): 画像から抽出した輪郭情報
+        contours (List[int]): 画像から抽出した輪郭情報
     Return:
-        approx (list[int]): 近似した輪郭情報
+        approx (List[int]): 近似した輪郭情報
     """
     approx = []
     for i in range(len(contours)):
