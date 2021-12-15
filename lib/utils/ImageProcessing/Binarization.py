@@ -265,16 +265,16 @@ def TwoThreshold(
     r, g, b = cv2.split(img)
 
     # for Red
-    IMAGE_R_bw = GlobalThreshold(r, UpperThreshold, Type)
-    IMAGE_R__ = GlobalThreshold(r, LowerThreshold, Type)
+    _, IMAGE_R_bw = GlobalThreshold(r, UpperThreshold, Type)
+    _, IMAGE_R__ = GlobalThreshold(r, LowerThreshold, Type)
     IMAGE_R__ = cv2.bitwise_not(IMAGE_R__)
     # for Green
-    IMAGE_G_bw = GlobalThreshold(g, UpperThreshold, Type)
-    IMAGE_G__ = GlobalThreshold(g, LowerThreshold, Type)
+    _, IMAGE_G_bw = GlobalThreshold(g, UpperThreshold, Type)
+    _, IMAGE_G__ = GlobalThreshold(g, LowerThreshold, Type)
     IMAGE_G__ = cv2.bitwise_not(IMAGE_G__)
     # for Blue
-    IMAGE_B_bw = GlobalThreshold(b, UpperThreshold, Type)
-    IMAGE_B__ = GlobalThreshold(b, LowerThreshold, Type)
+    _, IMAGE_B_bw = GlobalThreshold(b, UpperThreshold, Type)
+    _, IMAGE_B__ = GlobalThreshold(b, LowerThreshold, Type)
     IMAGE_B__ = cv2.bitwise_not(IMAGE_B__)
 
     IMAGE_bw = None

@@ -1,6 +1,7 @@
 import os
 import sys
 import time
+from tkinter.constants import N
 from typing import Dict, List, Tuple, Union
 
 sys.path.append(".")
@@ -1916,9 +1917,9 @@ class Dobot_APP:
             sg.popup("選択したデバイスは存在しません。", title="カメラ接続エラー")
             return 2  # Not found！
 
-        # ----------------------------#
+        # ---------------------#
         # カメラを接続するイベント #
-        # --------------------------- #
+        # -------------------- #
         # カメラを初めて接続する場合 -> カメラを新規接続
         if _CamList[str(dict_num)]["cam_num"] is None:
             cam_obj = VideoCaptureWrapper(
@@ -1928,23 +1929,15 @@ class Dobot_APP:
 
         # 接続したいカメラが接続していカメラと同じ場合 -> カメラを解放
         elif _CamList[str(dict_num)]["cam_num"] == cam_num:
-            # response, cam_obj = WebCam_OnOff(
-            #    cam_num, cam=_CamList[str(dict_num)]["cam_object"]
-            # )
             response, cam_obj = _CamList[str(dict_num)]["cam_object"].release()
         # 接続したいカメラと接続しているカメラが違う場合 -> 接続しているカメラを解放し、新規接続
         elif _CamList[str(dict_num)]["cam_num"] is not None:
             # まず接続しているカメラを開放する．
-            # response, cam_obj = WebCam_OnOff(
-            #     device_num=_CamList[str(dict_num)]["cam_num"],
-            #     cam=_CamList[str(dict_num)]["cam_object"],
-            # )
             response, cam_obj = _CamList[str(dict_num)]["cam_object"].release()
             # 開放できた場合
             if response == 1:
                 sg.popup(_WebCam_err[response], title="Camの接続")
                 # 次に新しいカメラを接続する．
-                # response, cam_obj = WebCam_OnOff(cam_num, cam=cam_obj)
                 cam_obj = VideoCaptureWrapper(cam_num, cam=cam_obj)
                 response = cam_obj.isError()
 
@@ -1993,7 +1986,7 @@ class Dobot_APP:
         else:
             bg_color = 0
 
-        err, dst_org, img, l_th, u_th = SnapshotCvt(
+        err, dst_org, dst_bin, l_th, u_th = SnapshotCvt(
             cam,
             Color_Space=values["-Color_Space-"],
             Color_Density=values["-Color_Density-"],
@@ -2011,14 +2004,14 @@ class Dobot_APP:
             sg.popup("画像処理エラー")
             return None, None  # None, None
 
-        # --------------------------------------- #
+        # ---------------------------- #
         # 画像サイズなどをダイアログ上に表示 #
-        # --------------------------------------- #
+        # ---------------------------- #
         c = 1
-        if len(img.shape) == 2:
-            h, w = img.shape
-        elif len(img.shape) == 3:
-            h, w, c = img.shape
+        if len(dst_bin.shape) == 2:
+            h, w = dst_bin.shape
+        elif len(dst_bin.shape) == 3:
+            h, w, c = dst_bin.shape
         else:
             ValueError("Image size is incorrect.")
         self.Window["-IMAGE_width-"].update(str(w))
@@ -2026,9 +2019,9 @@ class Dobot_APP:
         self.Window["-IMAGE_channel-"].update(str(c))
 
         if drawing:
-            self.ImageDrawingWindow(img, th_preview=values["-thresh_prev-"], threshold=(l_th, u_th))
+            self.ImageDrawingWindow(dst_bin, hist_img=dst_org, th_preview=values["-thresh_prev-"], threshold=(l_th, u_th))
 
-        return dst_org, img
+        return dst_org, dst_bin
 
     def ImgcvtBtn(
         self, img: np.ndarray, values: list, drawing: bool = True
@@ -2081,9 +2074,9 @@ class Dobot_APP:
             sg.popup("画像処理エラー")
             return None, None  # None, None
 
-        # --------------------------- #
+        # ---------------------------- #
         # 画像サイズなどをダイアログ上に表示 #
-        # --------------------------- #
+        # ---------------------------- #
         c = 1
         if len(dst_bin.shape) == 2:
             h, w = dst_bin.shape
@@ -2096,7 +2089,7 @@ class Dobot_APP:
         self.Window["-IMAGE_channel-"].update(str(c))
 
         if drawing:
-            self.ImageDrawingWindow(dst_bin, th_preview=values["-thresh_prev-"], threshold=(l_th, u_th))
+            self.ImageDrawingWindow(dst_bin, hist_img=img, th_preview=values["-thresh_prev-"], threshold=(l_th, u_th))
 
         return img, dst_bin
 
@@ -2107,9 +2100,9 @@ class Dobot_APP:
         dst, pred = predict(dst_org, dst_bin, self.network)
         angle = _ClassLabels[pred]
 
-        # --------------------------------------- #
+        # ---------------------------- #
         # 画像サイズなどをダイアログ上に表示 #
-        # --------------------------------------- #
+        # ---------------------------- #
         c = 1
         if len(dst.shape) == 2:
             h, w = dst.shape
@@ -2167,29 +2160,46 @@ class Dobot_APP:
             self.Window["-Angle-"].update(str(COG[2]))
         return 8, COG
 
-    def ImageDrawingWindow(self, img: np.ndarray, th_preview: bool = False, threshold: Union[None, int, float, Tuple[float]]=None) -> None:
+    def ImageDrawingWindow(self, img: np.ndarray, hist_img: Union[None, np.ndarray] = None, th_preview: bool = False, threshold: Union[None, int, float, Tuple[float]]=None) -> None:
         """画面上に撮影した画像を表示する関数
 
         Args:
             img (np.ndarray): 画面に表示させたい画面
+            hist_img (None|np.ndarray): ヒストグラム計算用の画像．指定されない場合は，表示画像でヒストグラムを計算．
         """
         src = img.copy()
         src = scale_box(src, self.Image_width, self.Image_height)
+
+        if type(hist_img) is None:
+            metrix = src
+        else:
+            metrix = hist_img.copy()
+            metrix = scale_box(metrix, self.Image_width, self.Image_height)
+
+        if isinstance(threshold, tuple):
+            threshold = [th for th in threshold if th != None]
+            # 空の配列の場合
+            if not threshold: threshold = None
+
         # エンコード用に画像のチェネルを B, G, R の順番に変更
         src = cv2.cvtColor(src, cv2.COLOR_RGB2BGR)
         imgbytes = cv2.imencode(".png", src)[1].tobytes()
         self.Window["-IMAGE-"].update(data=imgbytes)
 
-        # --------------------------------- #
+        # ------------------------------------ #
         # 画面上に撮影した画像のヒストグラムを表示する #
-        # --------------------------------- #
+        # ------------------------------------ #
         canvas_elem = self.Window["-CANVAS-"]
         canvas = canvas_elem.TKCanvas
         ticks = [0, 42, 84, 127, 169, 211, 255]
         fig, ax = plt.subplots(figsize=(3, 2))
+
+        # 閾値を表示しない or 閾値が None の場合
         if (not th_preview) or (threshold == None):
-            threshold = None
-        ax = Image_hist(src, ax, ticks, threshold=threshold)
+            ax = Image_hist(metrix, ax, ticks) # 閾値をヒストグラム上に表示しない．
+        else:
+            ax = Image_hist(metrix, ax, ticks, threshold=threshold)
+
         if self.fig_agg:
             # ** IMPORTANT ** Clean up previous drawing before drawing again
             delete_figure_agg(self.fig_agg)
@@ -2249,9 +2259,9 @@ class Dobot_APP:
         init_pose = self.InitPose
         # 現在のDobotの姿勢を取得
         pose = self.GetPose_UpdateWindow()  # pose -> self.CurrentPose
-        # ------------------------------ #
+        # ---------------------- #
         # Dobotの移動後の姿勢を計算 #
-        # ------------------------------ #
+        # ---------------------- #
         if len(dst_bin.shape) == 2:
             h, w = dst_bin.shape
         elif len(dst_bin.shape) == 3:
@@ -2332,9 +2342,9 @@ class Dobot_APP:
         init_pose = self.InitPose
         # 現在のDobotの姿勢を取得
         pose = self.GetPose_UpdateWindow()  # pose -> self.CurrentPose
-        # ------------------------------ #
+        # ---------------------- #
         # Dobotの移動後の姿勢を計算 #
-        # ------------------------------ #
+        # ---------------------- #
         if len(dst_bin.shape) == 2:
             h, w = dst_bin.shape
         elif len(dst_bin.shape) == 3:
@@ -2560,9 +2570,9 @@ class Dobot_APP:
 
         # 現在のDobotの姿勢を取得
         pose = self.GetPose_UpdateWindow()  # pose -> self.CurrentPose
-        # ------------------------------ #
+        # ---------------------- #
         # Dobotの移動後の姿勢を計算 #
-        # ------------------------------ #
+        # ---------------------- #
         if len(dst_bin.shape) == 2:
             h, w = dst_bin.shape
         elif len(dst_bin.shape) == 3:
@@ -2691,9 +2701,9 @@ class Dobot_APP:
 
         # 現在のDobotの姿勢を取得
         pose = self.GetPose_UpdateWindow()  # pose -> self.CurrentPose
-        # ------------------------------ #
+        # ---------------------- #
         # Dobotの移動後の姿勢を計算 #
-        # ------------------------------ #
+        # ---------------------- #
         if len(dst_bin.shape) == 2:
             h, w = dst_bin.shape
         elif len(dst_bin.shape) == 3:

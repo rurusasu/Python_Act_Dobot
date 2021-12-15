@@ -257,7 +257,7 @@ def ImageCvt(
     AdaptiveThreshold_Constant: int = 2,
     color: int = 4,
     background_color: Literal[0, 1] = 0
-) -> Tuple[int, np.ndarray, np.ndarray, Union[None, float], Union[None, float]]:
+) -> Tuple[int, np.ndarray, Union[None, float], Union[None, float]]:
     """
     入力画像に対して指定の処理を施す関数．
 
@@ -290,7 +290,6 @@ def ImageCvt(
     Returns:
         Tuple[int, np.ndarray, np.ndarray]: 返り値．
             * err (int): エラーフラグ．4: 撮影エラー, 5: 画像処理成功
-            * dst_org (np.ndarray): 撮影されたオリジナル画像．
             * dst_bin (np.ndarray): 画像処理された画像．
             * l_th (None|float): 下側の閾値．二値化処理を使用しなかった場合はNone．
             * u_th (None|float): 上側の閾値．2つの二値化処理以外を指定した場合はNone．
@@ -309,7 +308,7 @@ def ImageCvt(
         dst = Contrast_cvt(dst, Color_Density)
     # 二値化処理
     if Binarization == "None":
-        return 5, img, dst
+        return 5, dst, l_th, u_th
     else:
         # 大域的二値化処理
         if Binarization == "Global":
