@@ -81,7 +81,7 @@ def _VF(
     return_param = {"dst_org": dst_org, "dst_bin": dst_bin, "pose": None, "COG": COG}
     ui_que.put(return_param)
     # スナップショット撮影
-    err, dst_org, dst_bin = SnapshotCvt(
+    err, dst_org, dst_bin, _, _ = SnapshotCvt(
         cam,
         Color_Space=values["-Color_Space-"],
         Color_Density=values["-Color_Density-"],
@@ -104,7 +104,6 @@ def _VF(
         return_param["dst_bin"] = dst_bin
         ui_que.put(return_param)
 
-    """
     # 重心位置計算
     COG, dst_org = Contours(
         rgb_img=dst_org,
@@ -208,7 +207,6 @@ def _VF(
     return_param["pose"] = current_pose
     ui_que.put(return_param)
     return
-    """
 
 
 if __name__ == "__main__":
@@ -219,15 +217,15 @@ if __name__ == "__main__":
         Connect_Disconnect,
     )
 
-    # api = dType.load()  # Dobot 制御ライブラリの読み出し
-    # connection = False  # Dobotの接続状態
-    # connection = Connect_Disconnect(connection, api)
-    # pose = dType.GetPose(api)
+    api = dType.load()  # Dobot 制御ライブラリの読み出し
+    connection = False  # Dobotの接続状態
+    connection = Connect_Disconnect(connection, api)
+    pose = dType.GetPose(api)
 
     values = {
         "-MoveMode-": "MoveJCoordinate",
         "-Color_Space-": "RGB",
-        "-Color_Density-": "なし",
+        "-Color_Density-": "None",
         "-Binarization-": "Two",
         "-LowerThreshold-": "103",
         "-UpperThreshold-": "128",

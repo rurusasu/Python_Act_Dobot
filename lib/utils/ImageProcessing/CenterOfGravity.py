@@ -1,6 +1,6 @@
 import sys
 import os
-from typing import List, Tuple, Union
+from typing import List, Literal, Tuple, Union
 
 sys.path.append(".")
 sys.path.append("../")
@@ -9,14 +9,31 @@ sys.path.append("../../")
 import cv2
 import numpy as np
 
+CalcCOGMode = {
+    "image": 0,
+    "outline": 1,
+}
+# 輪郭情報
+RetrievalMode = {
+    "LIST": cv2.RETR_LIST,
+    "EXTERNAL": cv2.RETR_EXTERNAL,
+    "CCOMP": cv2.RETR_CCOMP,
+    "TREE": cv2.RETR_TREE,
+}
+# 輪郭の中間点情報
+ApproximateMode = {
+    "Keep": cv2.CHAIN_APPROX_NONE,
+    "Not-Keep": cv2.CHAIN_APPROX_SIMPLE,
+}
+
 
 def CenterOfGravity(
     rgb_img: np.ndarray,
     bin_img: np.ndarray,
-    RetrievalMode=cv2.RETR_EXTERNAL,
-    ApproximateMode=cv2.CHAIN_APPROX_NONE,
+    Retrieval: Literal["LIST", "EXTERNAL", "CCOMP", "TREE"] = "TREE",
+    Approximate: Literal["Keep", "Not-Keep"] = "Keep",
     min_area=100,
-    cal_Method: int = 0,
+    cal_Method: Literal["image", "outline"] = "image",
     orientation: bool = False,
     drawing_figure: bool = True,
 ) -> Tuple[Union[List[float], None], np.ndarray]:
@@ -26,39 +43,56 @@ def CenterOfGravity(
     Args:
         rgb_img (np.ndarray): 計算された重心位置を重ねて表示するRGB画像
         bin_img (np.ndarray): 重心計算対象の二値画像．
-        RetrievalMode (optional): 輪郭の階層情報
-            * cv2.RETR_LIST: 輪郭の親子関係を無視する(親子関係が同等に扱われるので、単なる輪郭として解釈される)。
-            * cv2.RETR_EXTERNAL: 最も外側の輪郭だけを検出するモード
-            * cv2.RETR_CCOMP: 2レベルの階層に分類する(物体の外側の輪郭を階層1、物体内側の穴などの輪郭を階層2として分類)。
-            * cv2.RETR_TREE: 全階層情報を保持する。
-        ApproximateMode (optional): 輪郭の近似方法
-            * cv2.CHAIN_APPROX_NONE: 中間点も保持する。
+        Retrieval (Literal["LIST", "EXTERNAL", "CCOMP", "TREE"], optional):
+            2値画像の画素値が 255 の部分と 0 の部分を分離した際に，その親子関係を保持するか指定．
+            Defaults to "TREE".
+            * "LIST": 輪郭の親子関係を無視する(親子関係が同等に扱われるので、単なる輪郭として解釈される)．
+            * "EXTERNAL": 最外の輪郭を検出する
+            * "CCOMP": 2つの階層に分類する(物体の外側の輪郭を階層1、物体内側の穴などの輪郭を階層2として分類).
+            * "TREE": 全階層情報を保持する
+        Approximate (Literal["Keep", "Not-Keep"], optional):
+            輪郭の近似方法．Defaults to "Keep"．
+            * "Keep": 中間点も保持する。
             * cv2.CHAIN_APPROX_SIMPLE: 中間点は保持しない。
         min_area (int): 領域が占める面積の閾値を指定
-        cal_Method (int optional): 重心計算を行う方法を選択する
-            * 0: 画像から重心を計算
-            * 1: オブジェクトの輪郭から重心を計算
+        cal_Method (Literal["image", "outline"] optional):
+            重心位置の計算対象．Defaults to "image".
+            * "image": 画像から重心を計算
+            * "outline": オブジェクトの輪郭から重心を計算
         orientation (bool, optional): オブジェクトの輪郭情報に基づいて姿勢を推定する関数．`cal_Method = 1` の場合のみ適用可能．Default to False.
         drawing_figure (bool optional): 輪郭線と重心位置が示された図を描画する。default to True
     Return:
         G (Union[List[float], None]): G=[x, y, angle], オブジェクトの重心座標と，そのオブジェクトの2D平面での回転角度．
         dst (np.ndarray): 重心位置が描画された二値画像
     """
+    # ------------ #
+    # 初期値設定 #
+    # ------------ #
     angle = None
+    # 親子関係の保持設定
+    if Retrieval in RetrievalMode:
+        Retrieval = RetrievalMode[Retrieval]
+    else:
+        raise ValueError("The `RetrievalMode` is invalid.")
+    if Approximate in ApproximateMode:
+        Approximate = ApproximateMode[Approximate]
+    else:
+        raise ValueError("The `Approximate` is invalid.")
+
     # 入力が2値画像以外の場合
     if (type(bin_img) is not np.ndarray) or (len(bin_img.shape) != 2):
         raise ValueError("入力画像が不正です！")
 
-    dst_rgb = rgb_img.copy()
-    dst_bin = bin_img.copy()
+    # dst_rgb = rgb_img.copy()
+    # dst_bin = bin_img.copy()
     # 画像をもとに重心を求める場合
     if cal_Method == 0:
-        M = cv2.moments(dst_bin, False)
+        M = cv2.moments(bin_img, False)
 
     # 輪郭から重心を求める場合
     else:
         contours = _ExtractContours(
-            bin_img=dst_bin,
+            bin_img=bin_img,
             RetrievalMode=RetrievalMode,
             ApproximateMode=ApproximateMode,
             min_area=min_area,
@@ -66,7 +100,7 @@ def CenterOfGravity(
 
         # 等高線の描画（Contour line drawing）
         if drawing_figure:
-            dst_bin = __drawing_edge(dst_bin, contours)
+            bin_img = __drawing_edge(bin_img, contours)
 
         maxCont = contours[0]
         for c in contours:
@@ -94,25 +128,25 @@ def CenterOfGravity(
                 box = cv2.boxPoints(rect)
 
                 box = np.int0(box)
-                dst_rgb = cv2.drawContours(dst_rgb, [box], 0, (0, 0, 255), 2)
+                rgb_img = cv2.drawContours(rgb_img, [box], 0, (0, 0, 255), 2)
                 # 小数点以下2桁に丸め
                 angle = round(angle, 2)
     if int(M["m00"]) == 0:
-        return None, dst_rgb
+        return None, rgb_img
 
     try:
         cx, cy = int(M["m10"] / M["m00"]), int(M["m01"] / M["m00"])
     except ZeroDivisionError:
-        return None, dst_rgb
+        return None, rgb_img
 
     # 重心位置を円で表示
     # 変数: img, 中心座標, 半径, 色
-    cv2.circle(dst_rgb, center=(cx, cy), radius=10, color=100, thickness=2)
+    cv2.circle(rgb_img, center=(cx, cy), radius=10, color=100, thickness=2)
 
     if drawing_figure:
-        cv2.imshow("Convert", dst_rgb)  # 画像を出力
+        cv2.imshow("Convert", rgb_img)  # 画像を出力
 
-    return [cx, cy, angle], dst_rgb
+    return [cx, cy, angle], rgb_img
 
 
 def _ExtractContours(

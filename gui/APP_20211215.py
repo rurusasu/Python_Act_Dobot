@@ -1,7 +1,6 @@
 import os
 import sys
 import time
-from tkinter.constants import N
 from typing import Dict, List, Tuple, Union
 
 sys.path.append(".")
@@ -36,9 +35,6 @@ from lib.models.make_network import make_network, ReadCNNWeights
 from lib.utils.base_utils import ReadJsonToDict, scale_box, WriteDataToJson
 from lib.utils.net_utils import predict
 
-# from ..DobotDLL
-
-# from PIL import Image
 
 _Dobot_err = {
     0: "DobotAct_NoError",
@@ -869,7 +865,12 @@ class Dobot_APP:
                 )
             ],
             [
-                sg.Button(button_text="Contours", disabled=False, size=(7, 1), key="-Contours-"),
+                sg.Button(
+                    button_text="Contours",
+                    disabled=False,
+                    size=(7, 1),
+                    key="-Contours-",
+                ),
             ],
             # 輪郭のモードを指定する
             [
@@ -1165,7 +1166,7 @@ class Dobot_APP:
         # ---------------------------------------------
         if event == "-Connect-":
             # Dobot 制御ライブラリの読み出し
-            if self.api is not None:
+            if self.api is None:
                 self.api = dType.load()
             self.connection, err = Connect_Disconnect(
                 self.connection,
@@ -1997,7 +1998,7 @@ class Dobot_APP:
             AdaptiveThreshold_BlockSize=int(values["-AdaptiveThreshold_BlockSize-"]),
             AdaptiveThreshold_Constant=int(values["-AdaptiveThreshold_Constant-"]),
             color=color,
-            background_color=bg_color
+            background_color=bg_color,
         )
 
         if err != 5:
@@ -2019,7 +2020,12 @@ class Dobot_APP:
         self.Window["-IMAGE_channel-"].update(str(c))
 
         if drawing:
-            self.ImageDrawingWindow(dst_bin, hist_img=dst_org, th_preview=values["-thresh_prev-"], threshold=(l_th, u_th))
+            self.ImageDrawingWindow(
+                dst_bin,
+                hist_img=dst_org,
+                th_preview=values["-thresh_prev-"],
+                threshold=(l_th, u_th),
+            )
 
         return dst_org, dst_bin
 
@@ -2067,7 +2073,7 @@ class Dobot_APP:
             AdaptiveThreshold_BlockSize=int(values["-AdaptiveThreshold_BlockSize-"]),
             AdaptiveThreshold_Constant=int(values["-AdaptiveThreshold_Constant-"]),
             color=color,
-            background_color=bg_color
+            background_color=bg_color,
         )
 
         if err != 5:
@@ -2089,7 +2095,12 @@ class Dobot_APP:
         self.Window["-IMAGE_channel-"].update(str(c))
 
         if drawing:
-            self.ImageDrawingWindow(dst_bin, hist_img=img, th_preview=values["-thresh_prev-"], threshold=(l_th, u_th))
+            self.ImageDrawingWindow(
+                dst_bin,
+                hist_img=img,
+                th_preview=values["-thresh_prev-"],
+                threshold=(l_th, u_th),
+            )
 
         return img, dst_bin
 
@@ -2160,7 +2171,13 @@ class Dobot_APP:
             self.Window["-Angle-"].update(str(COG[2]))
         return 8, COG
 
-    def ImageDrawingWindow(self, img: np.ndarray, hist_img: Union[None, np.ndarray] = None, th_preview: bool = False, threshold: Union[None, int, float, Tuple[float]]=None) -> None:
+    def ImageDrawingWindow(
+        self,
+        img: np.ndarray,
+        hist_img: Union[None, np.ndarray] = None,
+        th_preview: bool = False,
+        threshold: Union[None, int, float, Tuple[float]] = None,
+    ) -> None:
         """画面上に撮影した画像を表示する関数
 
         Args:
@@ -2179,7 +2196,8 @@ class Dobot_APP:
         if isinstance(threshold, tuple):
             threshold = [th for th in threshold if th != None]
             # 空の配列の場合
-            if not threshold: threshold = None
+            if not threshold:
+                threshold = None
 
         # エンコード用に画像のチェネルを B, G, R の順番に変更
         src = cv2.cvtColor(src, cv2.COLOR_RGB2BGR)
@@ -2196,7 +2214,7 @@ class Dobot_APP:
 
         # 閾値を表示しない or 閾値が None の場合
         if (not th_preview) or (threshold == None):
-            ax = Image_hist(metrix, ax, ticks) # 閾値をヒストグラム上に表示しない．
+            ax = Image_hist(metrix, ax, ticks)  # 閾値をヒストグラム上に表示しない．
         else:
             ax = Image_hist(metrix, ax, ticks, threshold=threshold)
 
@@ -2779,7 +2797,7 @@ def WebCamOption(device_name: str) -> int:
     return device_num
 
 
-def Image_hist(img, ax, ticks=None, threshold: Union[None, float]=None):
+def Image_hist(img, ax, ticks=None, threshold: Union[None, float] = None):
     """
     rgb_img と matplotlib.axes を受け取り、
     axes にRGBヒストグラムをplotして返す

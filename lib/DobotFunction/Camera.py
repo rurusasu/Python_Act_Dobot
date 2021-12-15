@@ -248,7 +248,9 @@ def Color_cvt(src: np.ndarray, color_type: str):
 def ImageCvt(
     img: np.ndarray,
     Color_Space: Literal["RGB", "Gray"] = "RGB",
-    Color_Density: Literal["None", "Linear", "Non-Linear", "Histogram-Flatten"] = "None",
+    Color_Density: Literal[
+        "None", "Linear", "Non-Linear", "Histogram-Flatten"
+    ] = "None",
     Binarization: Literal["None", "Global", "Otsu", "Adaptive", "Two"] = "None",
     LowerThreshold: int = 10,
     UpperThreshold: int = 150,
@@ -256,7 +258,7 @@ def ImageCvt(
     AdaptiveThreshold_BlockSize: int = 11,
     AdaptiveThreshold_Constant: int = 2,
     color: int = 4,
-    background_color: Literal[0, 1] = 0
+    background_color: Literal[0, 1] = 0,
 ) -> Tuple[int, np.ndarray, Union[None, float], Union[None, float]]:
     """
     入力画像に対して指定の処理を施す関数．
@@ -391,7 +393,9 @@ def ImageCvt(
 def SnapshotCvt(
     cam: cv2.VideoCapture,
     Color_Space: Literal["RGB", "Gray"] = "RGB",
-    Color_Density: Literal["None", "Linear", "Non-Linear", "Histogram-Flatten"] = "None",
+    Color_Density: Literal[
+        "None", "Linear", "Non-Linear", "Histogram-Flatten"
+    ] = "None",
     Binarization: Literal["None", "Global", "Otsu", "Adaptive", "Two"] = "None",
     LowerThreshold: int = 10,
     UpperThreshold: int = 150,
@@ -399,7 +403,7 @@ def SnapshotCvt(
     AdaptiveThreshold_BlockSize: int = 11,
     AdaptiveThreshold_Constant: int = 2,
     color: int = 4,
-    background_color: Literal[0, 1] = 0
+    background_color: Literal[0, 1] = 0,
 ) -> Tuple[int, np.ndarray, np.ndarray, Union[None, float], Union[None, float]]:
     """
     スナップショットを撮影し，二値化処理を行う関数．
@@ -456,7 +460,7 @@ def SnapshotCvt(
         AdaptiveThreshold_BlockSize=AdaptiveThreshold_BlockSize,
         AdaptiveThreshold_Constant=AdaptiveThreshold_Constant,
         color=color,
-        background_color=background_color
+        background_color=background_color,
     )
 
     return err, dst_org, dst_bin, l_th, u_th
@@ -467,7 +471,7 @@ def Contours(
     bin_img: np.ndarray,
     CalcCOG: Literal["image", "outline"] = "image",
     Retrieval: Literal["LIST", "EXTERNAL", "CCOMP", "TREE"] = "TREE",
-    Approximate: Literal["Keep", "Not-Keep"] ="Keep",
+    Approximate: Literal["Keep", "Not-Keep"] = "Keep",
     orientation: bool = False,
     drawing_figure: bool = True,
 ) -> Tuple[Union[List[float], None], np.ndarray]:
@@ -477,13 +481,13 @@ def Contours(
         rgb_img (np.ndarray): 計算された重心位置を重ねて表示するRGB画像
         bin_img (np.ndarray): 重心計算対象の二値画像．
         CalcCOG (Literal["image", "outline"], optional):
-            重心位置の計算対象を指定．Default to "image".
+            重心位置の計算対象を指定．Defaults to "image".
         Retrieval (Literal["LIST", "EXTERNAL", "CCOMP", "TREE"], optional):
             2値画像の画素値が 255 の部分と 0 の部分を分離した際に，その親子関係を保持するか指定．
-            Default to "TREE".
-            * "LIST": 親子関係を無視する
+            Defaults to "TREE".
+            * "LIST": 輪郭の親子関係を無視する(親子関係が同等に扱われるので、単なる輪郭として解釈される)．
             * "EXTERNAL": 最外の輪郭を検出する
-            * "CCOMP": 2つの階層に分類する
+            * "CCOMP": 2つの階層に分類する(物体の外側の輪郭を階層1、物体内側の穴などの輪郭を階層2として分類).
             * "TREE": 全階層情報を保持する
         Approximate (Literal["Keep", "Not-Keep"], optional):
             輪郭の中間点を保持するか指定．Default to "Keep".
@@ -491,28 +495,13 @@ def Contours(
             オブジェクトの輪郭情報に基づいて姿勢を推定する関数．
             `CalcCOG = "outline"` の場合のみ適用可能．Default to False.
         drawing_figure (bool, optional): 図を描画する．Default to True.
+
     Returns:
         COG (List[float]): COG=[x, y, angle]
             オブジェクトの重心座標と，そのオブジェクトの2D平面での回転角度．
         rgb_img (np.ndarray): [W, H, C] の rgb 画像．
     """
     COG = None
-    CalcCOGMode = {
-        "image": 0,
-        "outline": 1,
-    }
-    # 輪郭情報
-    RetrievalMode = {
-        "LIST": cv2.RETR_LIST,
-        "EXTERNAL": cv2.RETR_EXTERNAL,
-        "CCOMP": cv2.RETR_CCOMP,
-        "TREE": cv2.RETR_TREE,
-    }
-    # 輪郭の中間点情報
-    ApproximateMode = {
-        "Keep": cv2.CHAIN_APPROX_NONE,
-        "Not-Keep": cv2.CHAIN_APPROX_SIMPLE,
-    }
 
     if type(bin_img) != np.ndarray:
         raise TypeError("入力はnumpy配列を使用してください．")
@@ -522,8 +511,8 @@ def Contours(
         COG, rgb_img = CenterOfGravity(
             rgb_img=rgb_img,
             bin_img=bin_img,
-            RetrievalMode=RetrievalMode[Retrieval],
-            ApproximateMode=ApproximateMode[Approximate],
+            Retrieval=RetrievalMode[Retrieval],
+            Approximate=ApproximateMode[Approximate],
             min_area=100,
             cal_Method=CalcCOGMode[CalcCOG],
             orientation=orientation,

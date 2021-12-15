@@ -42,7 +42,7 @@ def Contrast_cvt(src: np.ndarray, Color_Density: Literal["None", "Linear", "Non-
             dst = _RGBHist(src)
             dst = cv2.cvtColor(dst, cv2.COLOR_BGR2RGB)
     else:
-        pass
+        dst = src
     return dst
 
 
