@@ -1,0 +1,138 @@
+{
+    "name": "item",
+    "securityToken": "item Token",
+    "sourceConnection": {
+        "name": "binarize_test",
+        "providerType": "localFileSystemProxy",
+        "providerOptions": {
+            "encrypted": "eyJjaXBoZXJ0ZXh0IjoiMmExNWQ5OTRmN2NmNzM2ODA3M2Y5MGU2OWJhOTQ1ZWQ1MDAxODJiMDY5MTk5ZmU4YjM4MGRiZmIyZjllNDI3NWI3NDdmOTY3NTE4ZTRiOTc3ZjY0ZTg3MzU4OGYwZGIwYzhkYTJjMWJhZGMwNjg3OTdkZjQxNjdiMjI5ZmJmYWMiLCJpdiI6IjQ2NjVlMWVmZDMxNWNkMzk0YTU2MTdlODRhMzk5YTE1Njc2Y2YwMGUzMGNkNmQzOCJ9"
+        },
+        "id": "KmElVrnkd"
+    },
+    "targetConnection": {
+        "name": "binarize_test",
+        "providerType": "localFileSystemProxy",
+        "providerOptions": {
+            "encrypted": "eyJjaXBoZXJ0ZXh0IjoiNDZjNTM1ZjAzYjAzNmJhOTJhMDcwNjcwNDNmNTAwMWUzZWU3MjA4NTlhNzQ0NmJiNjg3NmU0YzY5OGYxZDNlNWFjZjc4YjBkMmM1YzdlZWU3Mjg5NTg4ZDY1NjBlMjllZjM0YTdkNTYxMjlhNGQ1OGI1ZmM5Y2Y0M2Y0N2U1N2MiLCJpdiI6IjllN2E0NWRmNmE4YjgzZDg5Y2FkOTE1NGNmMmM2ZWVhZDI5YmFiYzhjOWIyYWQ3NSJ9"
+        },
+        "id": "KmElVrnkd"
+    },
+    "videoSettings": {
+        "frameExtractionRate": 15
+    },
+    "tags": [
+        {
+            "name": "pen2",
+            "color": "#0000FF"
+        },
+        {
+            "name": "dai",
+            "color": "#000080"
+        },
+        {
+            "name": "block",
+            "color": "#FF00FF"
+        },
+        {
+            "name": "jyuc",
+            "color": "#FF0000"
+        },
+        {
+            "name": "jyuc_g",
+            "color": "#800000"
+        },
+        {
+            "name": "brush",
+            "color": "#FFFF00"
+        },
+        {
+            "name": "coke",
+            "color": "#808000"
+        },
+        {
+            "name": "pen_gray",
+            "color": "#00FF00"
+        },
+        {
+            "name": "cup",
+            "color": "#008000"
+        }
+    ],
+    "id": "fhNYmHQZ4",
+    "activeLearningSettings": {
+        "autoDetect": false,
+        "predictTag": true,
+        "modelPathType": "coco"
+    },
+    "exportFormat": {
+        "providerType": "pascalVOC",
+        "providerOptions": {
+            "encrypted": "eyJjaXBoZXJ0ZXh0IjoiMWU0NjhlZDFkYWNhZDliZTM1MjI4NjhmYjU0ZTI0NWI2ZGQ0NjQ4ZDNiOGM1NzdhOTY3OGIxODc3YTY1ZWZiY2I4YTA5ZjMyODI1ODgxZmRjMjAzNGYyNmIwYTYyZTE3ZDQyYzhlYzVmNDE5ZGIzNmI5ZjIwMjZmMzkyZTg5MWMxNDkwY2Y0N2E0ZWUzNTVmY2ZmMGY3MjQ2YTIxOGI2YyIsIml2IjoiY2E5N2FlMWIyZmYyMjA4OGI5ZWY3NjIzNGUyODZlMjEzOTUwNzc1MzlkYTJiNDliIn0="
+        }
+    },
+    "version": "2.2.0",
+    "lastVisitedAssetId": "d810e04653df49b2ebc7a85cdeb6cc87",
+    "assets": {
+        "7e31e0761a2557a865e729719fb2ebc9": {
+            "format": "jpg",
+            "id": "7e31e0761a2557a865e729719fb2ebc9",
+            "name": "20211203-144643.jpg",
+            "path": "file:D:/My_programing/Dobot_python/assets/anns/20211203-144643.jpg",
+            "size": {
+                "width": 1280,
+                "height": 960
+            },
+            "state": 2,
+            "type": 1,
+            "predicted": true
+        },
+        "db7e4a3da32d6ef24386be275bd85738": {
+            "format": "jpg",
+            "id": "db7e4a3da32d6ef24386be275bd85738",
+            "name": "20211203-145425.jpg",
+            "path": "file:D:/My_programing/Dobot_python/assets/anns/20211203-145425.jpg",
+            "size": {
+                "width": 1280,
+                "height": 960
+            },
+            "state": 2,
+            "type": 1
+        },
+        "735772c879e5be87c4c55bc354a165ea": {
+            "format": "jpg",
+            "id": "735772c879e5be87c4c55bc354a165ea",
+            "name": "20211203-145517.jpg",
+            "path": "file:D:/My_programing/Dobot_python/assets/anns/20211203-145517.jpg",
+            "size": {
+                "width": 1280,
+                "height": 960
+            },
+            "state": 2,
+            "type": 1
+        },
+        "433065deaf02174a503f8104783dc009": {
+            "format": "jpg",
+            "id": "433065deaf02174a503f8104783dc009",
+            "name": "20211203-145558.jpg",
+            "path": "file:D:/My_programing/Dobot_python/assets/anns/20211203-145558.jpg",
+            "size": {
+                "width": 1280,
+                "height": 960
+            },
+            "state": 2,
+            "type": 1
+        },
+        "d810e04653df49b2ebc7a85cdeb6cc87": {
+            "format": "jpg",
+            "id": "d810e04653df49b2ebc7a85cdeb6cc87",
+            "name": "20211203-145649.jpg",
+            "path": "file:D:/My_programing/Dobot_python/assets/anns/20211203-145649.jpg",
+            "size": {
+                "width": 1280,
+                "height": 960
+            },
+            "state": 2,
+            "type": 1
+        }
+    }
+}

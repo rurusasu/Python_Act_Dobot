@@ -1,0 +1,36 @@
+item {
+ id: 1
+ name: 'pen2'
+}
+item {
+ id: 2
+ name: 'dai'
+}
+item {
+ id: 3
+ name: 'block'
+}
+item {
+ id: 4
+ name: 'jyuc'
+}
+item {
+ id: 5
+ name: 'jyuc_g'
+}
+item {
+ id: 6
+ name: 'brush'
+}
+item {
+ id: 7
+ name: 'coke'
+}
+item {
+ id: 8
+ name: 'pen_gray'
+}
+item {
+ id: 9
+ name: 'cup'
+}

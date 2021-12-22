@@ -1,0 +1,114 @@
+<annotation verified="yes">
+    <folder>Annotation</folder>
+    <filename>20211203-145558.jpg</filename>
+    <path>item-PascalVOC-export/Annotations/20211203-145558.jpg</path>
+    <source>
+        <database>Unknown</database>
+    </source>
+    <size>
+        <width>1280</width>
+        <height>960</height>
+        <depth>3</depth>
+    </size>
+    <segmented>0</segmented>
+    <object>
+    <name>dai</name>
+    <pose>Unspecified</pose>
+    <truncated>0</truncated>
+    <difficult>0</difficult>
+    <bndbox>
+        <xmin>0.18018018018018017</xmin>
+        <ymin>27.24890829694323</ymin>
+        <xmax>610.3030303030303</xmax>
+        <ymax>338.51528384279476</ymax>
+    </bndbox>
+</object><object>
+    <name>block</name>
+    <pose>Unspecified</pose>
+    <truncated>0</truncated>
+    <difficult>0</difficult>
+    <bndbox>
+        <xmin>53.644553644553646</xmin>
+        <ymin>293.44978165938863</ymin>
+        <xmax>266.45372645372646</xmax>
+        <ymax>481.04803493449776</ymax>
+    </bndbox>
+</object><object>
+    <name>coke</name>
+    <pose>Unspecified</pose>
+    <truncated>0</truncated>
+    <difficult>0</difficult>
+    <bndbox>
+        <xmin>281.1302211302211</xmin>
+        <ymin>368.90829694323145</ymin>
+        <xmax>595.6265356265355</xmax>
+        <ymax>560.6986899563319</ymax>
+    </bndbox>
+</object><object>
+    <name>jyuc_g</name>
+    <pose>Unspecified</pose>
+    <truncated>0</truncated>
+    <difficult>0</difficult>
+    <bndbox>
+        <xmin>572.5634725634726</xmin>
+        <ymin>7.336244541484716</ymin>
+        <xmax>1140.7534807534807</xmax>
+        <ymax>536.5938864628821</ymax>
+    </bndbox>
+</object><object>
+    <name>pen2</name>
+    <pose>Unspecified</pose>
+    <truncated>0</truncated>
+    <difficult>0</difficult>
+    <bndbox>
+        <xmin>418.46027846027846</xmin>
+        <ymin>590.0436681222708</ymin>
+        <xmax>697.3136773136773</xmax>
+        <ymax>834.2358078602621</ymax>
+    </bndbox>
+</object><object>
+    <name>cup</name>
+    <pose>Unspecified</pose>
+    <truncated>0</truncated>
+    <difficult>0</difficult>
+    <bndbox>
+        <xmin>257.018837018837</xmin>
+        <ymin>576.4192139737992</ymin>
+        <xmax>432.0884520884521</xmax>
+        <ymax>899.2139737991267</ymax>
+    </bndbox>
+</object><object>
+    <name>pen_gray</name>
+    <pose>Unspecified</pose>
+    <truncated>0</truncated>
+    <difficult>0</difficult>
+    <bndbox>
+        <xmin>741.3431613431613</xmin>
+        <ymin>644.5414847161572</ymin>
+        <xmax>992.940212940213</xmax>
+        <ymax>919.1266375545852</ymax>
+    </bndbox>
+</object><object>
+    <name>brush</name>
+    <pose>Unspecified</pose>
+    <truncated>0</truncated>
+    <difficult>0</difficult>
+    <bndbox>
+        <xmin>0</xmin>
+        <ymin>344.8034934497817</ymin>
+        <xmax>382.81736281736283</xmax>
+        <ymax>958.9519650655022</ymax>
+    </bndbox>
+</object><object>
+    <name>jyuc</name>
+    <pose>Unspecified</pose>
+    <truncated>0</truncated>
+    <difficult>0</difficult>
+    <bndbox>
+        <xmin>565.2252252252252</xmin>
+        <ymin>477.90393013100436</ymin>
+        <xmax>1220.4258804258805</xmax>
+        <ymax>689.6069868995633</ymax>
+    </bndbox>
+</object>
+</annotation>

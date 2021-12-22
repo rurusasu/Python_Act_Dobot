@@ -11,6 +11,7 @@ Path Settings
 cfg.CONFIG_DIR = os.path.dirname(os.path.abspath(__file__))
 cfg.LIB_DIR = os.path.dirname(cfg.CONFIG_DIR)
 cfg.ROOT_DIR = os.path.dirname(cfg.LIB_DIR)
+cfg.ASSETS_DIR = os.path.join(cfg.ROOT_DIR, "assets")
 cfg.GUI_DIR = os.path.join(cfg.ROOT_DIR, "gui")
 cfg.DLL_DIR = os.path.join(cfg.LIB_DIR, "DobotDLL")
 cfg.UTILS_DIR = os.path.join(cfg.LIB_DIR, "utils")
