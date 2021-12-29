@@ -32,7 +32,7 @@ from lib.DobotFunction.Communication import (
 )
 from lib.DobotFunction.VisualFeedback import VisualFeedback
 from lib.models.make_network import make_network, ReadCNNWeights
-from lib.utils.base_utils import ReadJsonToDict, scale_box, WriteDataToJson
+from lib.utils.base_utils import ReadJsonToDict, save_img, scale_box, WriteDataToJson
 from lib.utils.net_utils import predict
 
 
@@ -139,6 +139,7 @@ class Dobot_APP:
             "z": 0.0,
             "r": 0.0,
         }  # Dobotがオブジェクトを退避させる位置
+        self
         # カメラ座標系とロボット座標系とのキャリブレーション時の左上の位置座標
         self.Alignment_1 = {"x": None, "y": None}
         # カメラ座標系とロボット座標系とのキャリブレーション時の右下の位置座標
@@ -471,6 +472,8 @@ class Dobot_APP:
                     disabled=True,
                     key="-IMAGE_path-",
                 ),
+                sg.Input(size=(15, 1), disabled=True, key="-save_img_dir-"),
+                sg.FolderBrowse(button_text='save_dir')
             ],
             # ----------------------------------------
             # カメラの設定およびプレビュー部分_1
@@ -524,7 +527,7 @@ class Dobot_APP:
                 ),
                 # カメラのプレビュー
                 sg.Button(
-                    "Preview Opened", disabled=True, size=(13, 1), key="-Preview-"
+                    "Preview Opened", disabled=False, size=(13, 1), key="-Preview-"
                 ),
                 # 静止画撮影
                 # sg.Button("Snapshot 0", size=(8, 1), key="-Snapshot-"),
@@ -582,6 +585,7 @@ class Dobot_APP:
                 # sg.Button("Preview Opened 1", size=(13, 1), key="-Preview_1-"),
                 # 静止画撮影
                 sg.Button("Snapshot", disabled=False, size=(8, 1), key="-Snapshot-"),
+                sg.Button("Save Image", disabled=True, size=(8, 1), key="-save_img-"),
             ],
             # -------------------------------------
             # CNNの設定部分
@@ -1315,14 +1319,14 @@ class Dobot_APP:
             else:
                 self.Window["-main_cam_0-"].update(disabled=False)
 
-            if values["-main_cam_0-"] or values["-main_cam_1-"]:
-                if (_CamList["0"]["cam_object"] is not None) or (
-                    _CamList["1"]["cam_object"] is not None
-                ):
-                    self.Window["-Preview-"].update(disabled=False)
+            # if values["-main_cam_0-"] or values["-main_cam_1-"]:
+            #     if (_CamList["0"]["cam_object"] is not None) or (
+            #         _CamList["1"]["cam_object"] is not None
+            #     ):
+                    # self.Window["-Preview-"].update(disabled=False)
                     # self.Window["-Snapshot-"].update(disabled=False)
-                else:
-                    self.Window["-Preview-"].update(disabled=True)
+            #    else:
+                    # self.Window["-Preview-"].update(disabled=True)
                     # self.Window["-Snapshot-"].update(disabled=True)
 
         elif event == "-SetWebCam_1-":
@@ -1333,14 +1337,14 @@ class Dobot_APP:
             else:
                 self.Window["-main_cam_1-"].update(disabled=False)
 
-            if values["-main_cam_0-"] or values["-main_cam_1-"]:
-                if (_CamList["0"]["cam_object"] is not None) or (
-                    _CamList["1"]["cam_object"] is not None
-                ):
-                    self.Window["-Preview-"].update(disabled=False)
+            # if values["-main_cam_0-"] or values["-main_cam_1-"]:
+            #     if (_CamList["0"]["cam_object"] is not None) or (
+            #         _CamList["1"]["cam_object"] is not None
+            #     ):
+            #         self.Window["-Preview-"].update(disabled=False)
                     # self.Window["-Snapshot-"].update(disabled=False)
-                else:
-                    self.Window["-Preview-"].update(disabled=True)
+            #     else:
+            #         self.Window["-Preview-"].update(disabled=True)
                     # self.Window["-Snapshot-"].update(disabled=True)
 
         # ------------------------#
@@ -1721,6 +1725,21 @@ class Dobot_APP:
                 self.Task6(main_cam=main_cam, sub_cam=sub_cam, values=values)
 
         # ---------------------------------------------
+        # 画像 を保存する
+        # ---------------------------------------------
+        if event == "-save_img-":
+            # 保存先のディレクトリが設定されているかの確認
+            if values["-save_img_dir-"] == '':
+                sg.popup("The image saving directory has not been set.")
+                return
+            if type(self.IMAGE_Org) != np.ndarray:
+                sg.popup("The ndarray type is not stored in IMAGE_Org.")
+                return
+
+            dir_pth = values["-save_img_dir-"]
+            save_img(self.IMAGE_Org, dir_pth)
+
+        # ---------------------------------------------
         # values を保存する
         # ---------------------------------------------
         if event == "-save_cfg-":
@@ -1806,27 +1825,48 @@ class Dobot_APP:
     def loop(self):
         while True:
             event, values = self.Window.Read(timeout=10)
-            if event == "Quit":
+            if event == "Quit" or values == None:
                 break
             elif event != "__TIMEOUT__":
                 self.Event(event, values)
 
-            if self.preview:
+            # ---------------------------------
+            # values の値に応じて画面表示を切り替える
+            # ---------------------------------
+            if values["-save_img_dir-"] != '':
+                self.Window["-save_img-"].update(disabled=False)
+
+            # -----------------
+            # Preview を更新する
+            # -----------------
+            if not self.preview:
+                continue
+            else:
                 # WebCam が選択されている場合
                 if values["-WebCamChoice-"]:
                     if values["-main_cam_0-"]:
                         cam = _CamList["0"]["cam_object"]
                     elif values["-main_cam_1-"]:
                         cam = _CamList["1"]["cam_object"]
-                else:
-                    sg.popup("カメラを使用した機能が停止しました．")
-                    self.preview = False
-                    return
 
-                # どのラジオボタンもアクティブでない場合 -> カメラが1つも接続されていない場合．
-                if cam is None:
-                    return
-                self.SnapshotBtn(cam, values, drawing=True)
+                    # どのラジオボタンもアクティブでない場合 -> カメラが1つも接続されていない場合．
+                    if cam is None:
+                        sg.popup(_WebCam_err[2], title="カメラ接続エラー")
+                        self.preview = False
+                        continue
+                    self.SnapshotBtn(cam, values, drawing=True)
+
+                # Image が選択されている場合
+                else:
+                    # 画像ファイルが存在しない場合
+                    if not os.path.exists(values["-IMAGE_path-"]):
+                        sg.popup(_WebCam_err[6], title="画像読み出しエラー")
+                        self.preview = False
+                        continue
+                    else:
+                        img = cv2.imread(values["-IMAGE_path-"])
+                        img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)  # BGR -> RGB
+                        self.IMAGE_Org, self.IMAGE_bin = self.ImgcvtBtn(img, values)
 
     """
     ----------------------
@@ -1957,7 +1997,7 @@ class Dobot_APP:
 
     def SnapshotBtn(
         self, cam: cv2.VideoCapture, values: list, drawing: bool = True
-    ) -> np.ndarray:
+    ) -> Tuple[np.ndarray, np.ndarray]:
         """スナップショットの撮影から一連の画像処理を行う関数。
 
         Args:
@@ -2217,6 +2257,10 @@ class Dobot_APP:
             ax = Image_hist(metrix, ax, ticks)  # 閾値をヒストグラム上に表示しない．
         else:
             ax = Image_hist(metrix, ax, ticks, threshold=threshold)
+
+        # グラフ右と上の軸を消す
+        plt.gca().spines["right"].set_visible(False)
+        plt.gca().spines["top"].set_visible(False)
 
         if self.fig_agg:
             # ** IMPORTANT ** Clean up previous drawing before drawing again
@@ -2819,7 +2863,7 @@ def Image_hist(img, ax, ticks=None, threshold: Union[None, float] = None):
                 ax.vlines(i, 0, hist.max(), "k", linestyles="dashed")
         else:
             ax.vlines(threshold, 0, hist.max(), "k", linestyles="dashed")
-    ax.set_title("histogram")
+    # ax.set_title("histogram")
     ax.set_xlim([0, 256])
 
     return ax

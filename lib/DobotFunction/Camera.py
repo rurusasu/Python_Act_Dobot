@@ -297,7 +297,8 @@ def ImageCvt(
             * u_th (None|float): 上側の閾値．2つの二値化処理以外を指定した場合はNone．
     """
     l_th = u_th = None
-    dst = img.copy()
+    dst = img
+    # dst = img.copy()
 
     # ------------------ #
     # 撮影した画像を変換する #
@@ -315,7 +316,7 @@ def ImageCvt(
         # 大域的二値化処理
         if Binarization == "Global":
             if Color_Space == "RGB":
-                r, g, b = cv2.split(img)
+                r, g, b = cv2.split(dst)
                 if color == 0:  # Red
                     l_th, dst = GlobalThreshold(r, threshold=LowerThreshold)
                 elif color == 1:  # Green
@@ -329,7 +330,7 @@ def ImageCvt(
         # 大津の二値化処理
         elif Binarization == "Otsu":
             if Color_Space == "RGB":
-                r, g, b = cv2.split(img)
+                r, g, b = cv2.split(dst)
                 if color == 0:
                     l_th, dst = GlobalThreshold(r, Type="Otsu")
                 elif color == 1:
@@ -343,7 +344,7 @@ def ImageCvt(
         # 適応的二値化処理
         elif Binarization == "Adaptive":
             if Color_Space == "RGB":
-                r, g, b = cv2.split(img)
+                r, g, b = cv2.split(dst)
                 if color == 0:
                     dst = AdaptiveThreshold(
                         img=r,
@@ -385,7 +386,7 @@ def ImageCvt(
             l_th = LowerThreshold
             u_th = UpperThreshold
 
-        if background_color == 1:
+        if background_color == 0:
             dst = cv2.bitwise_not(dst)
     return 5, dst, l_th, u_th
 
