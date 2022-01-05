@@ -10,6 +10,8 @@ import cv2
 import numpy as np
 
 from lib.utils.ImageProcessing.GrayScale import AutoGrayScale
+from lib.utils.ImageProcessing.Adaptive_threshold.bradley import Bradley_threshold
+from lib.utils.ImageProcessing.Adaptive_threshold.wellner import Wellner_threshold
 
 
 def GlobalThreshold(
@@ -167,8 +169,9 @@ def AdaptiveThreshold(
             C=C,
         )
     elif method == "Wellner":
-        dst = _WellnerMethod(img)
-    # elif method == "Bradley":
+        dst = Wellner_threshold(img)
+    elif method == "Bradley":
+        dst = Bradley_threshold(img, kernel_size=block_size, T=C)
 
     return dst
 

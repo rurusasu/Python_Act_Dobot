@@ -1,5 +1,7 @@
+import re
 import sys
-from typing import Tuple, Union, List, Literal
+from typing import Dict, Tuple, Union, List, Literal
+from PySimpleGUI.PySimpleGUI import No
 
 sys.path.append(".")
 sys.path.append("..")
@@ -246,7 +248,7 @@ def Color_cvt(src: np.ndarray, color_type: str):
 
 
 def ImageCvt(
-    img: np.ndarray,
+    src: Dict[str, np.ndarray],
     Color_Space: Literal["RGB", "Gray"] = "RGB",
     Color_Density: Literal[
         "None", "Linear", "Non-Linear", "Histogram-Flatten"
@@ -264,7 +266,7 @@ def ImageCvt(
     入力画像に対して指定の処理を施す関数．
 
     Args:
-        img (np.ndarray): 変換前の画像データ．
+        src (Dict[Union[str: np.ndarray, str:None]]): 変換前の画像データ．
         Color_Space (Literal["RGB", "Gray"], optional):
             画像の階調．Defaults to "RGB".
         Color_Density (Literal["None", "Linear", "Non-Linear", "Histogram-Flatten"], optional):
@@ -296,71 +298,86 @@ def ImageCvt(
             * l_th (None|float): 下側の閾値．二値化処理を使用しなかった場合はNone．
             * u_th (None|float): 上側の閾値．2つの二値化処理以外を指定した場合はNone．
     """
+    img = {
+        "rgb": None,
+        "bin": None,
+    }
+
+    if type(src) == np.ndarray:
+        img["rgb"] = src
+    elif type(src) == tuple:
+        try:
+            img["rgb"] = src["rgb"]
+        except KeyError as e:
+            raise(f"{e}, comment: `rgb` does not exist in src.")
+    else:
+        raise("An undefined value was assigned to `src`.")
+
+    img["rgb_bin"] = np.zeros((img["rgb"].shape[0], img["rgb"].shape[1]))
+    r = g = b = np.zeros((img["rgb"].shape[0], img["rgb"].shape[1]))
     l_th = u_th = None
-    dst = img
-    # dst = img.copy()
 
     # ------------------ #
     # 撮影した画像を変換する #
     # ------------------ #
     # 色空間変換
     if Color_Space != "RGB":
-        dst = Color_cvt(dst, Color_Space)
+        img["rgb"] = Color_cvt(img["rgb"], Color_Space)
     # 濃度変換
     if Color_Density != "None":
-        dst = Contrast_cvt(dst, Color_Density)
+        img["rgb"] = Contrast_cvt(img["rgb"], Color_Density)
     # 二値化処理
     if Binarization == "None":
-        return 5, dst, l_th, u_th
+        return 5, img, l_th, u_th
     else:
         # 大域的二値化処理
         if Binarization == "Global":
             if Color_Space == "RGB":
-                r, g, b = cv2.split(dst)
+                r, g, b = cv2.split(img["rgb"])
                 if color == 0:  # Red
-                    l_th, dst = GlobalThreshold(r, threshold=LowerThreshold)
+                    l_th, img["bin"] = GlobalThreshold(r, threshold=LowerThreshold)
                 elif color == 1:  # Green
-                    l_th, dst = GlobalThreshold(g, threshold=LowerThreshold)
+                    l_th, img["bin"] = GlobalThreshold(g, threshold=LowerThreshold)
                 elif color == 2:
-                    l_th, dst = GlobalThreshold(b, threshold=LowerThreshold)
+                    l_th, img["bin"] = GlobalThreshold(b, threshold=LowerThreshold)
                 else:
                     pass
             else:
-                l_th, dst = GlobalThreshold(dst, threshold=LowerThreshold)
+                l_th, img["bin"] = GlobalThreshold(img["rgb"], threshold=LowerThreshold)
         # 大津の二値化処理
         elif Binarization == "Otsu":
             if Color_Space == "RGB":
-                r, g, b = cv2.split(dst)
+                r, g, b = cv2.split(img["rgb"])
                 if color == 0:
-                    l_th, dst = GlobalThreshold(r, Type="Otsu")
+                    l_th, img["bin"] = GlobalThreshold(r, Type="Otsu")
                 elif color == 1:
-                    l_th, dst = GlobalThreshold(g, Type="Otsu")
+                    l_th, img["bin"] = GlobalThreshold(g, Type="Otsu")
                 elif color == 2:
-                    l_th, dst = GlobalThreshold(b, Type="Otsu")
+                    l_th, img["bin"] = GlobalThreshold(b, Type="Otsu")
                 else:
                     pass
             else:
-                l_th, dst = GlobalThreshold(dst, Type="Otsu")
+                l_th, img["bin"] = GlobalThreshold(img["rgb"], Type="Otsu")
         # 適応的二値化処理
         elif Binarization == "Adaptive":
             if Color_Space == "RGB":
-                r, g, b = cv2.split(dst)
+                r, g, b = cv2.split(img["rgb"])
                 if color == 0:
-                    dst = AdaptiveThreshold(
+                    img["bin"] = AdaptiveThreshold(
                         img=r,
                         method=str(AdaptiveThreshold_type),
                         block_size=AdaptiveThreshold_BlockSize,
                         C=AdaptiveThreshold_Constant,
                     )
                 elif color == 1:
-                    dst = AdaptiveThreshold(
+                    img["bin"] = AdaptiveThreshold(
                         img=g,
                         method=str(AdaptiveThreshold_type),
                         block_size=AdaptiveThreshold_BlockSize,
                         C=AdaptiveThreshold_Constant,
                     )
                 elif color == 2:
-                    dst = AdaptiveThreshold(
+                    img["bin"] = AdaptiveThreshold(
                         img=b,
                         method=str(AdaptiveThreshold_type),
                         block_size=AdaptiveThreshold_BlockSize,
@@ -369,16 +386,16 @@ def ImageCvt(
                 else:
                     pass
             else:
-                dst = AdaptiveThreshold(
-                    img=dst,
+                img["bin"] = AdaptiveThreshold(
+                    img=img["rgb"],
                     method=str(AdaptiveThreshold_type),
                     block_size=AdaptiveThreshold_BlockSize,
                     C=AdaptiveThreshold_Constant,
                 )
         # 2つの閾値を用いた二値化処理
         elif Binarization == "Two" and color != 5:
-            dst = TwoThreshold(
-                img=dst,
+            img["bin"] = TwoThreshold(
+                img=img["rgb"],
                 LowerThreshold=LowerThreshold,
                 UpperThreshold=UpperThreshold,
                 PickupColor=color,
@@ -387,8 +404,9 @@ def ImageCvt(
             u_th = UpperThreshold
 
         if background_color == 0:
-            dst = cv2.bitwise_not(dst)
-    return 5, dst, l_th, u_th
+            img["bin"] = cv2.bitwise_not(img["bin"])
+
+    return 5, img, l_th, u_th
 
 
 def SnapshotCvt(
@@ -444,14 +462,18 @@ def SnapshotCvt(
             * l_th (None|float): 下側の閾値．二値化処理を使用しなかった場合はNone．
             * u_th (None|float): 上側の閾値．2つの二値化処理以外を指定した場合はNone．
     """
+    img = {
+        "rgb": None,
+        "bin": None,
+    }
     l_th = u_th = None
-    err, dst_org = Snapshot(cam)
+    err, img["rgb"] = Snapshot(cam)
 
     if err != 3:
         return 4, [], []  # WebCam_NotGetImage
 
-    err, dst_bin, l_th, u_th = ImageCvt(
-        dst_org,
+    err, img, l_th, u_th = ImageCvt(
+        img,
         Color_Space=Color_Space,
         Color_Density=Color_Density,
         Binarization=Binarization,
@@ -464,7 +486,7 @@ def SnapshotCvt(
         background_color=background_color,
     )
 
-    return err, dst_org, dst_bin, l_th, u_th
+    return err, img, l_th, u_th
 
 
 def Contours(
