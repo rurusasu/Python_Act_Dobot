@@ -305,13 +305,13 @@ def ImageCvt(
 
     if type(src) == np.ndarray:
         img["rgb"] = src
-    elif type(src) == tuple:
+    elif type(src) == dict:
         try:
             img["rgb"] = src["rgb"]
         except KeyError as e:
-            raise(f"{e}, comment: `rgb` does not exist in src.")
+            raise (f"{e}, comment: `rgb` does not exist in src.")
     else:
-        raise("An undefined value was assigned to `src`.")
+        raise ("An undefined value was assigned to `src`.")
 
     img["rgb_bin"] = np.zeros((img["rgb"].shape[0], img["rgb"].shape[1]))
     r = g = b = np.zeros((img["rgb"].shape[0], img["rgb"].shape[1]))
@@ -470,7 +470,7 @@ def SnapshotCvt(
     err, img["rgb"] = Snapshot(cam)
 
     if err != 3:
-        return 4, [], []  # WebCam_NotGetImage
+        return 4, [], 0, 0  # WebCam_NotGetImage
 
     err, img, l_th, u_th = ImageCvt(
         img,
