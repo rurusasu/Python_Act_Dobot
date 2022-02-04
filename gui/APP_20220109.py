@@ -154,9 +154,8 @@ class Dobot_APP:
         self.preview_cam = None
         self.IMAGE_Org = None  # スナップショットのオリジナル画像(RGB)
         self.IMAGE_bin = None  # 二値画像
-        self.IMAGE = {
-            "rgb": None,
-            "bin": None,
+        self.IMAGE = {"rgb": None,
+                      "bin": None,
         }
         # --- 画像プレビュー画面の初期値 --- #
         self.fig_agg = None  # 画像のヒストグラムを表示する用の変数
@@ -479,7 +478,7 @@ class Dobot_APP:
                     key="-IMAGE_path-",
                 ),
                 sg.Input(size=(15, 1), disabled=True, key="-save_img_dir-"),
-                sg.FolderBrowse(button_text="save_dir"),
+                sg.FolderBrowse(button_text='save_dir')
             ],
             # ----------------------------------------
             # カメラの設定およびプレビュー部分_1
@@ -1329,11 +1328,11 @@ class Dobot_APP:
             #     if (_CamList["0"]["cam_object"] is not None) or (
             #         _CamList["1"]["cam_object"] is not None
             #     ):
-            # self.Window["-Preview-"].update(disabled=False)
-            # self.Window["-Snapshot-"].update(disabled=False)
+                    # self.Window["-Preview-"].update(disabled=False)
+                    # self.Window["-Snapshot-"].update(disabled=False)
             #    else:
-            # self.Window["-Preview-"].update(disabled=True)
-            # self.Window["-Snapshot-"].update(disabled=True)
+                    # self.Window["-Preview-"].update(disabled=True)
+                    # self.Window["-Snapshot-"].update(disabled=True)
 
         elif event == "-SetWebCam_1-":
             device_name = values["-WebCam_Name_1-"]
@@ -1348,10 +1347,10 @@ class Dobot_APP:
             #         _CamList["1"]["cam_object"] is not None
             #     ):
             #         self.Window["-Preview-"].update(disabled=False)
-            # self.Window["-Snapshot-"].update(disabled=False)
+                    # self.Window["-Snapshot-"].update(disabled=False)
             #     else:
             #         self.Window["-Preview-"].update(disabled=True)
-            # self.Window["-Snapshot-"].update(disabled=True)
+                    # self.Window["-Snapshot-"].update(disabled=True)
 
         # ------------------------#
         # プレビューを表示するイベント #
@@ -1735,16 +1734,14 @@ class Dobot_APP:
         # ---------------------------------------------
         if event == "-save_img-":
             # 保存先のディレクトリが設定されているかの確認
-            if values["-save_img_dir-"] == "":
+            if values["-save_img_dir-"] == '':
                 sg.popup("The image saving directory has not been set.")
                 return
             if type(self.IMAGE["rgb"]) != np.ndarray:
                 sg.popup("The ndarray type is not stored in IMAGE[`rgb`].")
                 return
 
-            dir_pth = create_dir_name_date(
-                root_pth=values["-save_img_dir-"], dir_name=values["-Binarization-"]
-            )
+            dir_pth = create_dir_name_date(root_pth=values["-save_img_dir-"], dir_name=values["-Binarization-"])
             save_img(self.IMAGE["rgb"], dir_pth, file_name="orig")
 
             if type(self.IMAGE["bin"]) == np.ndarray:
@@ -1760,7 +1757,7 @@ class Dobot_APP:
                     clr = "bk"
                 else:
                     clr = "None"
-                f_name = "clr" + "_" + clr
+                f_name = "clr"+"_"+clr
                 save_img(self.IMAGE["bin"], dir_pth, file_name=f_name)
         # ---------------------------------------------
         # values を保存する
@@ -1856,7 +1853,7 @@ class Dobot_APP:
             # ---------------------------------
             # values の値に応じて画面表示を切り替える
             # ---------------------------------
-            if values["-save_img_dir-"] != "":
+            if values["-save_img_dir-"] != '':
                 self.Window["-save_img-"].update(disabled=False)
 
             # -----------------
@@ -2102,6 +2099,7 @@ class Dobot_APP:
                     threshold=(l_th, u_th),
                 )
 
+
     def ImgcvtBtn(
         self, img: np.ndarray, values: list, drawing: bool = True
     ) -> Tuple[np.ndarray, np.ndarray]:
@@ -2158,6 +2156,7 @@ class Dobot_APP:
             for k in dst.keys():
                 self.IMAGE[k] = dst[k]
 
+
         # ---------------------------- #
         # 画像サイズなどをダイアログ上に表示 #
         # ---------------------------- #
@@ -2187,6 +2186,7 @@ class Dobot_APP:
                     th_preview=values["-thresh_prev-"],
                     threshold=(l_th, u_th),
                 )
+
 
     def PredictBtn(self, cam: cv2.VideoCapture, values: list, drawing: bool = True):
         # 画像を撮影する．
@@ -2356,9 +2356,7 @@ class Dobot_APP:
 
         self.SnapshotBtn(cam, values, drawing=False)
         # 画像を撮影 & 重心位置を計算
-        err, COG = self.ContoursBtn(
-            self.IMAGE["rgb"], self.IMAGE["bin"], values, drawing=False
-        )
+        err, COG = self.ContoursBtn(self.IMAGE["rgb"], self.IMAGE["bin"], values, drawing=False)
         if err == 7:
             sg.popup("画像のチャネル数が不正です。", titile=_WebCam_err[err])
             return
@@ -2441,9 +2439,7 @@ class Dobot_APP:
 
         self.SnapshotBtn(cam, values, drawing=False)
         # 画像を撮影 & 重心位置を計算
-        err, COG = self.ContoursBtn(
-            self.IMAGE["rgb"], self.IMAGE["bin"], values, drawing=False
-        )
+        err, COG = self.ContoursBtn(self.IMAGE["rgb"], self.IMAGE["bin"], values, drawing=False)
 
         if err == 7:
             sg.popup("画像のチャネル数が不正です。", titile=_WebCam_err[err])
@@ -2668,9 +2664,7 @@ class Dobot_APP:
 
         self.SnapshotBtn(main_cam, values, drawing=False)
         # 画像を撮影 & 重心位置を計算
-        err, COG = self.ContoursBtn(
-            self.IMAGE["rgb"], self.IMAGE["bin"], values, drawing=False
-        )
+        err, COG = self.ContoursBtn(self.IMAGE["rgb"], self.IMAGE["bin"], values, drawing=False)
 
         if err == 7:
             sg.popup("画像のチャネル数が不正です。", titile=_WebCam_err[err])
@@ -2801,9 +2795,7 @@ class Dobot_APP:
 
         self.SnapshotBtn(main_cam, values, drawing=False)
         # 画像を撮影 & 重心位置を計算
-        err, COG = self.ContoursBtn(
-            self.IMAGE["rgb"], self.IMAGE["bin"], values, drawing=False
-        )
+        err, COG = self.ContoursBtn(self.IMAGE["rgb"], self.IMAGE["bin"], values, drawing=False)
 
         if err == 7:
             sg.popup("画像のチャネル数が不正です。", titile=_WebCam_err[err])
